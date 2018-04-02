@@ -92,7 +92,9 @@ func matchDate(s string) (year, mon, day, result string) {
 
 var discTrackRegexps = []string{
   // pattern: 's01t01', 'd01t01', 's1 01', 'd301', 'd1_01'
-  `[sd](?P<disc>\d{1,2})[-. _t]*(?P<track>\d{1,2})`,
+  `[sd](?P<disc>\d{2})[-. _t]*(?P<track>\d{2})`,
+  `[sd](?P<disc>\d{1})[-. _t]*(?P<track>\d{2})`,
+  `[sd](?P<disc>\d{1})[-. _t]*(?P<track>\d{1})`,
 }
 
 func matchDiscTrack(s string) (disc, track, result string) {
