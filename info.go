@@ -15,15 +15,15 @@ import (
 var dateRegexps = []string{
   // pattern: '2000-1-01' '2000/01/01' '2000.1.1'
   // also multiple days: '2000.01.01-03' '2000.01.31,01'
-  `(?P<year>\d{4})[/.-]{1}(?P<month>\d{1,2})[/.-]{1}(?P<day>\d{1,2}[-,]*\d*)`,
-  // pattern: '98-08-23'
-  `(?P<year>\d{2})[/.-]{1}(?P<month>\d{1,2})[/.-]{1}(?P<day>\d{1,2})`,
-  // pattern: '01.01.2000' '1/1/2000' '1-01-2000'
-  `(?P<month>\d{1,2})[/.-]{1}(?P<day>\d{1,2})[/.-]{1}(?P<year>\d{4})`,
-  // pattern: '03-30-69' '06.09.73'
-  `(?P<month>\d{1,2})[/.-]{1}(?P<day>\d{1,2})[/.-]{1}(?P<year>\d{2})`,
+  `(?P<year>\d{4})[/\.-]{1}(?P<month>\d{1,2})[/\.-]{1}(?P<day>\d{1,2}[-,]*\d*)`,
   // pattern: nugs.net: sci160318d1_01_Shine, ph990710d1_01_Wilson
   `[a-z0-9]{2,10}(?P<year>\d{2})(?P<month>\d{2})(?P<day>\d{2})`,
+  // pattern: '01.01.2000' '1/1/2000' '1-01-2000'
+  `(?P<month>\d{1,2})[/\.-]{1}(?P<day>\d{1,2})[/\.-]{1}(?P<year>\d{4})`,
+  // pattern: '03-30-69' '06.09.73'
+  `(?P<month>\d{1,2})[/\.-]{1}(?P<day>\d{1,2})[/\.-]{1}(?P<year>\d{2})`,
+  // pattern: '98-08-23'
+  `(?P<year>\d{2})[/\.-]{1}(?P<month>\d{1,2})[/\.-]{1}(?P<day>\d{1,2})`,
 }
 
 // strip off multiple days or day range
@@ -44,17 +44,21 @@ func validDate(year, mon, day string) bool {
 // irerate through dateRegexps returning first valid date found
 func matchDate(s string) (year, mon, day, result string) {
   for i, regExpStr := range dateRegexps {
-    m, r := regexpMatch(s, regExpStr)
+    m, remain := regexpMatch(s, regExpStr)
     if len(m) == 0 {
       continue
     }
 
     // order of matches depends on position within dateRegexps slice
-    if i > 1 {
+    if i > 1 && i != 4 {
+      // month day year
       year, mon, day = m[3], m[1], m[2]
     } else {
+      // year month day
       year, mon, day = m[1], m[2], m[3]
     }
+    mon = fmt.Sprintf("%02s", mon)
+    day = fmt.Sprintf("%02s", day)
 
     // expand year to include century
     if len(year) == 2 {
@@ -78,10 +82,9 @@ func matchDate(s string) (year, mon, day, result string) {
 
     v := validDate(year, mon, matchDay(day))
     if !v {
-      fmt.Printf("Error: %v\n", m)
       continue
     }
-    result = r
+    result = remain
     break
   }
   return year, mon, day, result
