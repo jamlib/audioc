@@ -11,6 +11,34 @@ import (
   "strings"
 )
 
+type info struct {
+  Year, Month, Day string
+  Disc, Track string
+}
+
+func infoFromFile(file string) (*info, string) {
+  i := &info{}
+  file = i.matchDate(file)
+  file = i.matchDiscTrack(file)
+
+  return i, file
+}
+
+func infoFromPath(p, sep string) {
+  pathArray := strings.Split(p, sep)
+  for _, s := range reverse(pathArray) {
+    if len(s) == 0 {
+      continue
+    }
+    fmt.Printf("%v\n", s)
+  }
+}
+
+// converts roman numeral to int; only needs to support up to 5
+var romanNumeralMap = map[string]string{
+  "I": "1", "II": "2", "III": "3", "IV": "4", "V": "5",
+}
+
 // date expressed in multiple ways
 var dateRegexps = []string{
   // pattern: '2000-1-01' '2000/01/01' '2000.1.1'
@@ -41,28 +69,38 @@ func validDate(year, mon, day string) bool {
   return true
 }
 
+// if full date not found, try year only
+func (i *info) matchYearOnly(s string) string {
+  m, remain := regexpMatch(s, `^(?P<year>\d{4})\s{1}-*\s*`)
+  if len(m) < 2 {
+    return s
+  }
+  i.Year = m[1]
+  return remain
+}
+
 // irerate through dateRegexps returning first valid date found
-func matchDate(s string) (year, mon, day, result string) {
-  for i, regExpStr := range dateRegexps {
+func (i *info) matchDate(s string) string {
+  for index, regExpStr := range dateRegexps {
     m, remain := regexpMatch(s, regExpStr)
     if len(m) == 0 {
       continue
     }
 
     // order of matches depends on position within dateRegexps slice
-    if i > 1 && i != 4 {
+    if index > 1 && index != 4 {
       // month day year
-      year, mon, day = m[3], m[1], m[2]
+      i.Year, i.Month, i.Day = m[3], m[1], m[2]
     } else {
       // year month day
-      year, mon, day = m[1], m[2], m[3]
+      i.Year, i.Month, i.Day = m[1], m[2], m[3]
     }
-    mon = fmt.Sprintf("%02s", mon)
-    day = fmt.Sprintf("%02s", day)
+    i.Month = fmt.Sprintf("%02s", i.Month)
+    i.Day = fmt.Sprintf("%02s", i.Day)
 
     // expand year to include century
-    if len(year) == 2 {
-      y, err := strconv.Atoi(year)
+    if len(i.Year) == 2 {
+      y, err := strconv.Atoi(i.Year)
       if err != nil {
         continue
       }
@@ -74,41 +112,41 @@ func matchDate(s string) (year, mon, day, result string) {
 
       if y > ri {
         li, _ := strconv.Atoi(l)
-        year = strconv.Itoa(li-1) + year
+        i.Year = strconv.Itoa(li-1) + i.Year
       } else {
-        year = l + year
+        i.Year = l + i.Year
       }
     }
 
-    v := validDate(year, mon, matchDay(day))
+    v := validDate(i.Year, i.Month, matchDay(i.Day))
     if !v {
       continue
     }
-    result = remain
-    break
+    return remain
   }
-  return year, mon, day, result
+  return s
 }
 
 var discTrackRegexps = []string{
+  // pattern:^ '1-01 ', '01-02 ', '1-3 - '
+  `^(?P<disc>\d{1,2})-(?P<track>\d{1,2})\s{1}[-]*\s*`,
   // pattern: 's01t01', 'd01t01', 's1 01', 'd301', 'd1_01'
   `[sd](?P<disc>\d{2})[-. _t]*(?P<track>\d{2})`,
   `[sd](?P<disc>\d{1})[-. _t]*(?P<track>\d{2})`,
   `[sd](?P<disc>\d{1})[-. _t]*(?P<track>\d{1})`,
 }
 
-func matchDiscTrack(s string) (disc, track, result string) {
+func (i *info) matchDiscTrack(s string) string {
   for _, regExpStr := range discTrackRegexps {
     m, r := regexpMatch(s, regExpStr)
     if len(m) == 0 {
       continue
     }
 
-    disc, track = m[1], m[2]
-    result = r
-    break
+    i.Disc, i.Track = m[1], m[2]
+    return r
   }
-  return disc, track, result
+  return s
 }
 
 func regexpMatch(s, regExpStr string) ([]string, string) {

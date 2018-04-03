@@ -7,9 +7,6 @@ import (
   "github.com/JamTools/goff/ffprobe"
 )
 
-var imageExts = []string{ "jpeg", "jpg", "png" }
-var audioExts = []string{ "flac", "m4a", "mp3", "mp4", "shn", "wav" }
-
 func main() {
   args, cont := processFlags()
   if !cont {
@@ -21,20 +18,40 @@ func main() {
     fmt.Printf("Flag artist: %v\n\n", flagArtist)
   }
 
-  dir := args[0]
-  fi, err := os.Stat(dir)
+  dirEntry := args[0]
+  fi, err := os.Stat(dirEntry)
   if err != nil || !fi.IsDir() {
-    fmt.Printf("Error: not a directory.\n%v\n\n", dir)
+    fmt.Printf("Error: not a directory.\n%v\n\n", dirEntry)
     os.Exit(1)
   }
 
-  fmt.Printf("Path:\n%v\n\n", dir)
+  process(dirEntry)
+}
 
-  audio := filesByExtension(dir, audioExts)
-  for i := range audio {
-    infoFromPath(audio[i])
+func process(dirEntry string) {
+  fmt.Printf("Path:\n%v\n\n", dirEntry)
+
+  audio := filesByExtension(dirEntry, audioExts)
+  for x := range audio {
+    p, dir, file := pathInfo(dirEntry, audio[x])
+
+    images := filesByExtension(dir, imageExts)
+    fmt.Printf("Images:\n%v\n\n", images)
+
+    fmt.Printf("File: %v\n", file)
+
+    i, r := infoFromFile(file)
+    fmt.Printf("Date: %s-%s-%s\n", i.Year, i.Month, i.Day)
+    fmt.Printf("Disc/Track: %s/%s\n", i.Disc, i.Track)
+    fmt.Printf("Remain: %v\n\n", r)
+
+    fmt.Printf("Path[]:\n")
+    infoFromPath(dir, string(os.PathSeparator))
+
     fmt.Println()
-    probeData(audio[i])
+    probeData(p)
+
+    break // debug
   }
 }
 
