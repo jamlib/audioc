@@ -24,14 +24,16 @@ Usage: audiocc [OPTIONS] PATH
 Options:
 `
 
-var flagVersion, flagCollection bool
+var flagCollection, flagForce, flagSimulate, flagVersion bool
 var flagArtist string
 
 func init() {
   // setup options
-  flag.BoolVar(&flagVersion, "version", false, "print program version, then exit")
-  flag.BoolVar(&flagCollection, "collection", false, "treat as collection of artists")
   flag.StringVar(&flagArtist, "artist", "", "treat as specific artist")
+  flag.BoolVar(&flagCollection, "collection", false, "treat as collection of artists")
+  flag.BoolVar(&flagForce, "force", false, "probes all files, even if path looks good")
+  flag.BoolVar(&flagSimulate, "simulate", false, "displays output, does not make changes")
+  flag.BoolVar(&flagVersion, "version", false, "print program version, then exit")
 
   // --help
   flag.Usage = func() {
@@ -54,6 +56,13 @@ func processFlags() ([]string, bool) {
 
   // show --help unless args
   if len(a) != 1 {
+    flag.Usage()
+    return a, false
+  }
+
+  // must specify --artist OR --collection
+  if flagArtist == "" && !flagCollection {
+    fmt.Printf("\nError: Must provide option --artist OR --collection\n")
     flag.Usage()
     return a, false
   }
