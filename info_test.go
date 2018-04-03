@@ -39,9 +39,28 @@ func TestValidDate(t *testing.T) {
   }
 }
 
+func TestMatchYearOnly(t *testing.T) {
+  tests := [][]string{
+    { "Test 2000 More", "", "Test 2000 More" },
+    { "2000 Album Name", "2000", "Album Name" },
+    { "2001 - Venue, City", "2001", "Venue, City" },
+  }
+
+  for x := range tests {
+    i := &info{}
+    remain := i.matchYearOnly(tests[x][0])
+    if i.Year != tests[x][1] {
+      t.Errorf("Expected %v, got %v", tests[x][1], i.Year)
+    }
+    if remain != tests[x][2] {
+      t.Errorf("Expected %v, got %v", tests[x][1], remain)
+    }
+  }
+}
+
 func TestMatchDate(t *testing.T) {
   tests := [][][]string{
-    { { "not a date" }, { "", "", "", "" } },
+    { { "not a date" }, { "", "", "", "not a date" } },
     { { "2000.01.01 Venue, City" }, { "2000", "01", "01", " Venue, City" } },
     { { "2000/1/01INFO" }, { "2000", "01", "01", "INFO" } },
     { { "2000-1-1" }, { "2000", "01", "01", "" } },
@@ -59,19 +78,22 @@ func TestMatchDate(t *testing.T) {
     { { "04.05.06" }, { "2006", "04", "05", "" } },
   }
 
-  for i := range tests {
-    year, mon, day, remain := matchDate(tests[i][0][0])
-    compare := []string{ year, mon, day, remain }
-    if strings.Join(compare, "\n") != strings.Join(tests[i][1], "\n") {
-      t.Errorf("Expected %v, got %v", tests[i][1], compare)
+  for x := range tests {
+    i := &info{}
+    remain := i.matchDate(tests[x][0][0])
+    compare := []string{ i.Year, i.Month, i.Day, remain }
+    if strings.Join(compare, "\n") != strings.Join(tests[x][1], "\n") {
+      t.Errorf("Expected %v, got %v", tests[x][1], compare)
     }
   }
 }
 
-
 func TestMatchDiscTrack(t *testing.T) {
   tests := [][][]string{
-    { { "not a tract" }, { "", "", "" } },
+    { { "not a track" }, { "", "", "not a track" } },
+    { { "1-01 " }, { "1", "01", "" } },
+    { { "01-02 Album" }, { "01", "02", "Album" } },
+    { { "1-3 - Venue" }, { "1", "3", "Venue" } },
     { { "s01t01" }, { "01", "01", "" } },
     { { "d01t02" }, { "01", "02", "" } },
     { { "s2 01" }, { "2", "01", "" } },
@@ -79,11 +101,12 @@ func TestMatchDiscTrack(t *testing.T) {
     { { "d2_05" }, { "2", "05", "" } },
   }
 
-  for i := range tests {
-    disc, track, remain := matchDiscTrack(tests[i][0][0])
-    compare := []string{ disc, track, remain }
-    if strings.Join(compare, "\n") != strings.Join(tests[i][1], "\n") {
-      t.Errorf("Expected %v, got %v", tests[i][1], compare)
+  for x := range tests {
+    i := &info{}
+    remain := i.matchDiscTrack(tests[x][0][0])
+    compare := []string{ i.Disc, i.Track, remain }
+    if strings.Join(compare, "\n") != strings.Join(tests[x][1], "\n") {
+      t.Errorf("Expected %v, got %v", tests[x][1], compare)
     }
   }
 }
