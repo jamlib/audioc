@@ -2,34 +2,19 @@ package main
 
 import (
   "os"
-  "fmt"
   "sort"
   "strings"
   "path/filepath"
 )
 
-func infoFromPath(p string) {
+var imageExts = []string{ "jpeg", "jpg", "png" }
+var audioExts = []string{ "flac", "m4a", "mp3", "mp4", "shn", "wav" }
+
+func pathInfo(base, path string) (string, string, string) {
+  p := filepath.Join(base, path)
   dir, file := filepath.Split(p)
-
-  fmt.Printf("File: %v, Ext: %v\n", file, filepath.Ext(file))
   file = strings.TrimRight(file, filepath.Ext(file))
-
-  year, mon, day, file := matchDate(file)
-  fmt.Printf("Date: %s-%s-%s, Remain: %v\n", year, mon, day, file)
-
-  disc, track, file := matchDiscTrack(file)
-  fmt.Printf("Disc/Track: %s-%s, Remain: %v\n\n", disc, track, file)
-
-  fmt.Printf("Images:\n")
-  fmt.Printf("%v\n\n", filesByExtension(dir, imageExts))
-
-  fmt.Printf("Path[]:\n")
-  pathArray := strings.Split(dir, string(os.PathSeparator))
-  for i := range reverse(pathArray) {
-    if len(pathArray[i]) > 0 {
-      fmt.Printf("%v\n", pathArray[i])
-    }
-  }
+  return p, dir, file
 }
 
 func filesByExtension(dir string, exts []string) []string {
@@ -45,6 +30,10 @@ func filesByExtension(dir string, exts []string) []string {
 
     x := sort.SearchStrings(exts, ext)
     if x < len(exts) && exts[x] == ext {
+      p = p[len(dir):]
+      if p[0] == os.PathSeparator {
+        p = p[1:]
+      }
       files = append(files, p)
     }
 
@@ -55,6 +44,7 @@ func filesByExtension(dir string, exts []string) []string {
   if err != nil {
     return []string{}
   }
+  sort.Strings(files)
 
   return files
 }
