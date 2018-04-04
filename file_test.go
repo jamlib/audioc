@@ -1,12 +1,31 @@
 package main
 
 import (
+  "io"
   "os"
   "strings"
   "testing"
   "io/ioutil"
   "path/filepath"
 )
+
+func tmpFile(t *testing.T, input string, f func(in *os.File)) {
+  in, err := ioutil.TempFile("", "")
+  if err != nil {
+    t.Fatal(err)
+  }
+  defer os.Remove(in.Name())
+  defer in.Close()
+
+  _, err = io.WriteString(in, input)
+  if err != nil {
+    t.Fatal(err)
+  }
+
+  _, _ = in.Seek(0, os.SEEK_SET)
+
+  f(in)
+}
 
 func createTestFiles(paths map[string]string, t *testing.T) string {
   td, err := ioutil.TempDir("", "")
@@ -46,17 +65,49 @@ func createTestFiles(paths map[string]string, t *testing.T) string {
 func TestPathInfo(t *testing.T) {
   tests := [][][]string{
     {
-      { "dir1", "dir2/file1.ext" },
-      { "dir1/dir2/file1.ext", "dir1/dir2/", "file1" },
+      { "dir1", "dir2/dir3/file1.ext" },
+      { "dir1/dir2/dir3/file1.ext", "dir1/dir2/dir3", "dir2/dir3", "file1", ".ext" },
+    }, {
+      { "dir3/dir4", "file2.ext" },
+      { "dir3/dir4/file2.ext", "dir3/dir4", "dir4", "file2", ".ext" },
     },
   }
 
   for x := range tests {
-    p, dir, file := pathInfo(tests[x][0][0], tests[x][0][1])
-    compare := []string{ p, dir, file }
+    pi := getPathInfo(tests[x][0][0], tests[x][0][1])
+    compare := []string{ pi.Fullpath, pi.Fulldir, pi.Dir, pi.File, pi.Ext }
     if strings.Join(compare, "\n") != strings.Join(tests[x][1], "\n") {
       t.Errorf("Expected %v, got %v", tests[x][1], compare)
     }
+  }
+}
+
+func TestCheckDirInvalid(t *testing.T) {
+  // not exist
+  _, err := checkDir("audiocc-path-def-dne")
+  if err == nil {
+    t.Errorf("Expected error, got nil")
+  }
+
+  // not directory
+  tmpFile(t, "", func(in *os.File){
+    _, err := checkDir(in.Name())
+    if err == nil {
+      t.Errorf("Expected error, got nil")
+    }
+  })
+}
+
+func TestCheckDir(t *testing.T) {
+  td, err := ioutil.TempDir("", "")
+  if err != nil {
+    t.Fatal(err)
+  }
+  defer os.RemoveAll(td)
+
+  _, err = checkDir(td)
+  if err != nil {
+    t.Errorf("Expected nil, got %v", err)
   }
 }
 
@@ -110,4 +161,8 @@ func TestFilesByExtensionAudio(t *testing.T) {
   if strings.Join(paths, "\n") != strings.Join(result, "\n") {
     t.Errorf("Expected %v, got %v", result, paths)
   }
+}
+
+func TestSafeFilename(t *testing.T) {
+  // TODO
 }
