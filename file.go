@@ -2,7 +2,9 @@ package main
 
 import (
   "os"
+  "fmt"
   "sort"
+  "regexp"
   "strings"
   "path/filepath"
 )
@@ -10,11 +12,39 @@ import (
 var imageExts = []string{ "jpeg", "jpg", "png" }
 var audioExts = []string{ "flac", "m4a", "mp3", "mp4", "shn", "wav" }
 
-func pathInfo(base, path string) (string, string, string) {
-  p := filepath.Join(base, path)
-  dir, file := filepath.Split(p)
-  file = strings.TrimRight(file, filepath.Ext(file))
-  return p, dir, file
+type pathInfo struct {
+  Fullpath, Fulldir string
+  Dir, File, Ext string
+}
+
+func getPathInfo(base, path string) *pathInfo {
+  pi := &pathInfo{Fullpath: filepath.Join(base, path) }
+
+  pi.Fulldir, pi.File = filepath.Split(pi.Fullpath)
+  pi.Fulldir = filepath.Clean(pi.Fulldir)
+
+  pi.Dir = strings.TrimPrefix(pi.Fulldir, base)
+  if pi.Dir == "" {
+    pi.Dir = filepath.Base(pi.Fulldir)
+  }
+  pi.Dir = strings.TrimPrefix(pi.Dir, string(os.PathSeparator))
+
+  pi.Ext = filepath.Ext(pi.File)
+  pi.File = strings.TrimSuffix(pi.File, pi.Ext)
+
+  return pi
+}
+
+func checkDir(dir string) (string, error) {
+  dir = filepath.Clean(dir)
+  fi, err := os.Stat(dir)
+  if err != nil {
+    return dir, err
+  }
+  if !fi.IsDir() {
+    return dir, fmt.Errorf("Not a directory")
+  }
+  return dir, nil
 }
 
 func filesByExtension(dir string, exts []string) []string {
@@ -47,4 +77,9 @@ func filesByExtension(dir string, exts []string) []string {
   sort.Strings(files)
 
   return files
+}
+
+// replaces \ & / from proposed file name
+func safeFilename(f string) string {
+  return regexp.MustCompile(`[\/\\]+`).ReplaceAllString(f, "_")
 }
