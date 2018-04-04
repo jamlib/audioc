@@ -3,6 +3,7 @@ package main
 import (
   "os"
   "fmt"
+  "strings"
 
   "github.com/JamTools/goff/ffprobe"
 )
@@ -13,58 +14,80 @@ func main() {
     os.Exit(1)
   }
 
+  dir, err := checkDir(args[0])
+  if err != nil {
+    fmt.Printf("Error: %v\n%v\n\n", err.Error(), dir)
+    os.Exit(1)
+  }
+
   fmt.Printf("\nFlag collection: %v\n", flagCollection)
   if flagArtist != "" {
     fmt.Printf("Flag artist: %v\n\n", flagArtist)
   }
 
-  dirEntry := args[0]
-  fi, err := os.Stat(dirEntry)
-  if err != nil || !fi.IsDir() {
-    fmt.Printf("Error: not a directory.\n%v\n\n", dirEntry)
-    os.Exit(1)
-  }
-
-  process(dirEntry)
+  fmt.Printf("Path: %v\n\n", dir)
+  process(dir)
 }
 
 func process(dirEntry string) {
-  fmt.Printf("Path:\n%v\n\n", dirEntry)
+  currentDir := ""
+  images := []string{}
 
   audio := filesByExtension(dirEntry, audioExts)
   for x := range audio {
-    p, dir, file := pathInfo(dirEntry, audio[x])
+    pi := getPathInfo(dirEntry, audio[x])
 
-    images := filesByExtension(dir, imageExts)
-    fmt.Printf("Images:\n%v\n\n", images)
+    if skipArtistOnCollection(pi.Dir) {
+      continue
+    }
 
-    fmt.Printf("File: %v\n", file)
+    if pi.Dir != currentDir {
+      // only need to process images once
+      images = filesByExtension(pi.Fulldir, imageExts)
+      currentDir = string(pi.Dir)
+    }
 
-    i, r := infoFromFile(file)
-    fmt.Printf("Date: %s-%s-%s\n", i.Year, i.Month, i.Day)
-    fmt.Printf("Disc/Track: %s/%s\n", i.Disc, i.Track)
-    fmt.Printf("Remain: %v\n\n", r)
+    i, _ := infoFromFile(pi.File)
+    i2 := infoFromPath(pi.Dir, string(os.PathSeparator))
+    fmt.Printf("File: %#v\nPath: %#v\n", i, i2)
 
-    fmt.Printf("Path[]:\n")
-    infoFromPath(dir, string(os.PathSeparator))
+    d, err := ffprobe.GetData(pi.Fullpath)
+    if err != nil {
+      fmt.Errorf("%v\n\n", err)
+      return
+    }
+    fmt.Printf("Tags: %#v\n\n", d.Format.Tags)
 
-    fmt.Println()
-    probeData(p)
+    // wait to move files until all files within path have been processed
+    if x <= len(audio)-1 {
+      save := true
+      if x < len(audio)-1 {
+        ni := getPathInfo(dirEntry, audio[x+1])
+        if ni.Dir == currentDir {
+          save = false
+        }
+      }
+      if save {
+        // TODO: move files to updated path
+        fmt.Printf("Images:\n%v\n\n", images)
+        images = []string{}
+      }
+    }
 
-    break // debug
+    // debug
+    if x >= 50 {
+      break
+    }
+
   }
 }
 
-func probeData(p string) {
-  d, err := ffprobe.GetData(p)
-  if err != nil {
-    fmt.Errorf("%v", err)
+func skipArtistOnCollection(p string) bool {
+  if flagCollection {
+    pa := strings.Split(p, string(os.PathSeparator))
+    if strings.Index(pa[0], " - ") != -1 {
+      return true
+    }
   }
-
-  for i := range d.Streams {
-    fmt.Printf("Stream %v: %#v\n", i, d.Streams[i])
-  }
-
-  fmt.Printf("Format: %#v\n", d.Format)
-  fmt.Printf("Tags: %#v\n\n", d.Format.Tags)
+  return false
 }
