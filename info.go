@@ -12,26 +12,40 @@ import (
 )
 
 type info struct {
-  Year, Month, Day string
-  Disc, Track string
+  Album, Year, Month, Day string
+  Disc, Track, Title string
 }
 
-func infoFromFile(file string) (*info, string) {
+func infoFromFile(s string) (*info, string) {
   i := &info{}
-  file = i.matchDate(file)
-  file = i.matchDiscTrack(file)
+  s = i.matchDate(s)
+  s = i.matchDiscTrack(s)
+  i.Title = fixWhitespace(matchTitle(s))
 
-  return i, file
+  return i, s
 }
 
-func infoFromPath(p, sep string) {
+func infoFromPath(p, sep string) *info {
+  i := &info{}
   pathArray := strings.Split(p, sep)
   for _, s := range reverse(pathArray) {
     if len(s) == 0 {
       continue
     }
-    fmt.Printf("%v\n", s)
+    if len(i.Disc) == 0 {
+      s = i.matchDiscOnly(s)
+    }
+    if len(i.Year) == 0 && len(i.Month) == 0 && len(i.Day) == 0 {
+      s = i.matchDate(s)
+    }
+    if len(i.Year) == 0 {
+      s = i.matchYearOnly(s)
+    }
+    if len(i.Album) == 0 {
+      i.Album = fixWhitespace(s)
+    }
   }
+  return i
 }
 
 // converts roman numeral to int; only needs to support up to 5
@@ -52,11 +66,6 @@ var dateRegexps = []string{
   `(?P<month>\d{1,2})[/\.-]{1}(?P<day>\d{1,2})[/\.-]{1}(?P<year>\d{2})`,
   // pattern: '98-08-23'
   `(?P<year>\d{2})[/\.-]{1}(?P<month>\d{1,2})[/\.-]{1}(?P<day>\d{1,2})`,
-}
-
-// strip off multiple days or day range
-func matchDay(d string) string {
-  return regexp.MustCompile(`\d{1,2}`).FindString(d)
 }
 
 // ensure date inputs are valid
@@ -87,49 +96,64 @@ func (i *info) matchDate(s string) string {
       continue
     }
 
+    var year, mon, day string
+
     // order of matches depends on position within dateRegexps slice
     if index > 1 && index != 4 {
       // month day year
-      i.Year, i.Month, i.Day = m[3], m[1], m[2]
+      year, mon, day = m[3], m[1], m[2]
     } else {
       // year month day
-      i.Year, i.Month, i.Day = m[1], m[2], m[3]
-    }
-    i.Month = fmt.Sprintf("%02s", i.Month)
-    i.Day = fmt.Sprintf("%02s", i.Day)
-
-    // expand year to include century
-    if len(i.Year) == 2 {
-      y, err := strconv.Atoi(i.Year)
-      if err != nil {
-        continue
-      }
-
-      // compare with current year to determine prefix
-      nowYear := strconv.Itoa(time.Now().Year())
-      l, r := nowYear[:2], nowYear[2:]
-      ri, _ := strconv.Atoi(r)
-
-      if y > ri {
-        li, _ := strconv.Atoi(l)
-        i.Year = strconv.Itoa(li-1) + i.Year
-      } else {
-        i.Year = l + i.Year
-      }
+      year, mon, day = m[1], m[2], m[3]
     }
 
-    v := validDate(i.Year, i.Month, matchDay(i.Day))
+    // formatting
+    mon = fmt.Sprintf("%02s", mon)
+    day = fmt.Sprintf("%02s", day)
+    year = yearEnsureCentury(year)
+
+    v := validDate(year, mon, regexp.MustCompile(`\d{1,2}`).FindString(day))
     if !v {
       continue
     }
+
+    i.Year, i.Month, i.Day = year, mon, day
     return remain
   }
   return s
 }
 
+// expand year to include century
+func yearEnsureCentury(year string) string {
+  if len(year) == 2 {
+    y, err := strconv.Atoi(year)
+    if err != nil {
+      return ""
+    }
+
+    // compare with current year to determine prefix
+    nowYear := strconv.Itoa(time.Now().Year())
+    l, r := nowYear[:2], nowYear[2:]
+    ri, _ := strconv.Atoi(r)
+
+    if y > ri {
+      li, _ := strconv.Atoi(l)
+      year = strconv.Itoa(li-1) + year
+    } else {
+      year = l + year
+    }
+  }
+  if len(year) != 4 {
+    return ""
+  }
+  return year
+}
+
 var discTrackRegexps = []string{
   // pattern:^ '1-01 ', '01-02 ', '1-3 - '
   `^(?P<disc>\d{1,2})-(?P<track>\d{1,2})\s{1}[-]*\s*`,
+  // pattern:^ '01 - ', '1 ', '1-' (only track)
+  `^(?P<disc>)(?P<track>\d{1,2})\s*[-]*\s*`,
   // pattern: 's01t01', 'd01t01', 's1 01', 'd301', 'd1_01'
   `[sd](?P<disc>\d{2})[-. _t]*(?P<track>\d{2})`,
   `[sd](?P<disc>\d{1})[-. _t]*(?P<track>\d{2})`,
@@ -149,6 +173,15 @@ func (i *info) matchDiscTrack(s string) string {
   return s
 }
 
+func (i *info) matchDiscOnly(s string) string {
+  m, remain := regexpMatch(s, `(?i)(cd|disc|set|disk)\s*(?P<disc>\d{1,2})\s*`)
+  if len(m) < 3 {
+    return s
+  }
+  i.Disc = m[2]
+  return remain
+}
+
 func regexpMatch(s, regExpStr string) ([]string, string) {
   m := regexp.MustCompile(regExpStr).FindStringSubmatch(s)
 
@@ -158,4 +191,22 @@ func regexpMatch(s, regExpStr string) ([]string, string) {
   }
 
   return m, s
+}
+
+func matchTitle(s string) string {
+  // remove () (1) []
+  s = regexp.MustCompile(`\s*[\[\(]{1}[\d\s]*[\]\)]{1}\s*`).ReplaceAllString(s, "")
+
+  // match only allowed characters
+  s = regexp.MustCompile(`([A-Za-z0-9]|[-',./!?&> ()])+`).FindString(s)
+
+  return fixWhitespace(s)
+  // replace special chars with -, then remove duplicate - w/whitespace
+  // remove anything except A-Za-z0-9 at beginning or end
+  // remove bitrate/file extension/SBD from end
+}
+
+// replace whitespaces with one space
+func fixWhitespace(s string) string {
+  return strings.TrimSpace(regexp.MustCompile(`\s+`).ReplaceAllString(s, " "))
 }
