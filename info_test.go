@@ -5,17 +5,36 @@ import (
   "testing"
 )
 
-func TestMatchDay(t *testing.T) {
-  tests := [][]string{
-    { "01", "01" },
-    { "01-03", "01" },
-    { "01,03", "01" },
+func TestInfoFromFile(t *testing.T) {
+    tests := [][][]string{
+    { { "sci160318d1_01_Shine" }, { "2016", "03", "18", "1", "01", "Shine" } },
+    { { "jgb1980-02-28d1t1 Sugaree" }, { "1980", "02", "28", "1", "1", "Sugaree" } },
   }
 
-  for i := range tests {
-    r := matchDay(tests[i][0])
-    if r != tests[i][1] {
-      t.Errorf("Expected %v, got %v", tests[i][1], r)
+  for x := range tests {
+    i, _ := infoFromFile(tests[x][0][0])
+    compare := []string{ i.Year, i.Month, i.Day, i.Disc, i.Track, i.Title }
+    if strings.Join(compare, "\n") != strings.Join(tests[x][1], "\n") {
+      t.Errorf("Expected %v, got %v", tests[x][1], compare)
+    }
+  }
+}
+
+func TestInfoFromPath(t *testing.T) {
+    tests := [][][]string{
+    {
+      { "Jerry Garcia Band/1980/1980.02.28 Kean College After Midnight - FLAC" },
+      { "1980", "02", "28", "Kean College After Midnight - FLAC" },
+    },{
+      { "Grateful Dead/1975/1975 Blues For Allah" }, { "1975", "", "", "Blues For Allah" },
+    },
+  }
+
+  for x := range tests {
+    i := infoFromPath(tests[x][0][0], "/")
+    compare := []string{ i.Year, i.Month, i.Day, i.Album }
+    if strings.Join(compare, "\n") != strings.Join(tests[x][1], "\n") {
+      t.Errorf("Expected %v, got %v", tests[x][1], compare)
     }
   }
 }
@@ -88,12 +107,29 @@ func TestMatchDate(t *testing.T) {
   }
 }
 
+func TestYearEnsureCentury(t *testing.T) {
+  tests := [][]string{
+    { "01", "2001" },
+    { "01342", "" },
+    { "ab", "" },
+  }
+
+  for i := range tests {
+    r := yearEnsureCentury(tests[i][0])
+    if r != tests[i][1] {
+      t.Errorf("Expected %v, got %v", tests[i][1], r)
+    }
+  }
+}
+
 func TestMatchDiscTrack(t *testing.T) {
   tests := [][][]string{
     { { "not a track" }, { "", "", "not a track" } },
     { { "1-01 " }, { "1", "01", "" } },
     { { "01-02 Album" }, { "01", "02", "Album" } },
     { { "1-3 - Venue" }, { "1", "3", "Venue" } },
+    { { "1-Label" }, { "", "1", "Label" } },
+    { { "01 - City" }, { "", "01", "City" } },
     { { "s01t01" }, { "01", "01", "" } },
     { { "d01t02" }, { "01", "02", "" } },
     { { "s2 01" }, { "2", "01", "" } },
@@ -107,6 +143,38 @@ func TestMatchDiscTrack(t *testing.T) {
     compare := []string{ i.Disc, i.Track, remain }
     if strings.Join(compare, "\n") != strings.Join(tests[x][1], "\n") {
       t.Errorf("Expected %v, got %v", tests[x][1], compare)
+    }
+  }
+}
+
+func TestMatchDiscOnly(t *testing.T) {
+  tests := [][]string{
+    { "SET 1", "1", "" },
+    { "disc 02 ", "02", "" },
+    { "yes cd 3 no", "3", "no" },
+  }
+
+  for x := range tests {
+    i := &info{}
+    remain := i.matchDiscOnly(tests[x][0])
+    if i.Disc != tests[x][1] {
+      t.Errorf("Expected %v, got %v", tests[x][1], i.Disc)
+    }
+    if remain != tests[x][2] {
+      t.Errorf("Expected %v, got %v", tests[x][1], remain)
+    }
+  }
+}
+
+func TestMatchTitle(t *testing.T) {
+  tests := [][]string{
+    { "( ) Silly () (5) []", "Silly" },
+  }
+
+  for i := range tests {
+    r := matchTitle(tests[i][0])
+    if r != tests[i][1] {
+      t.Errorf("Expected %v, got %v", tests[i][1], r)
     }
   }
 }
