@@ -3,10 +3,16 @@ package main
 import (
   "os"
   "fmt"
+  "log"
   "strings"
 
   "github.com/JamTools/goff/ffprobe"
 )
+
+type audiocc struct {
+  DirCur, DirEntry string
+  Images []string
+}
 
 func main() {
   args, cont := processFlags()
@@ -26,52 +32,42 @@ func main() {
   }
 
   fmt.Printf("Path: %v\n\n", dir)
-  process(dir)
+  a := &audiocc{ DirEntry: dir }
+  err = a.process()
+  if err != nil {
+    log.Fatal(err)
+  }
 }
 
-func process(dirEntry string) {
-  currentDir := ""
-  images := []string{}
-
-  audio := filesByExtension(dirEntry, audioExts)
+func (a *audiocc) process() error {
+  audio := filesByExtension(a.DirEntry, audioExts)
   for x := range audio {
-    pi := getPathInfo(dirEntry, audio[x])
+    pi := getPathInfo(a.DirEntry, audio[x])
 
     if skipArtistOnCollection(pi.Dir) {
       continue
     }
 
-    if pi.Dir != currentDir {
-      // only need to process images once
-      images = filesByExtension(pi.Fulldir, imageExts)
-      currentDir = string(pi.Dir)
+    if pi.Dir != a.DirCur {
+      // process images once per directory
+      a.processImages(pi.Fulldir)
+      a.DirCur = string(pi.Dir)
     }
 
-    i, _ := infoFromFile(pi.File)
-    i2 := infoFromPath(pi.Dir, string(os.PathSeparator))
-    fmt.Printf("File: %#v\nPath: %#v\n", i, i2)
+    i := &info{}
+    i.fromFile(pi.File)
+    i.fromPath(pi.Dir, string(os.PathSeparator))
+    fmt.Printf("Info: %#v\n", i)
 
     d, err := ffprobe.GetData(pi.Fullpath)
     if err != nil {
-      fmt.Errorf("%v\n\n", err)
-      return
+      return err
     }
     fmt.Printf("Tags: %#v\n\n", d.Format.Tags)
 
-    // wait to move files until all files within path have been processed
-    if x <= len(audio)-1 {
-      save := true
-      if x < len(audio)-1 {
-        ni := getPathInfo(dirEntry, audio[x+1])
-        if ni.Dir == currentDir {
-          save = false
-        }
-      }
-      if save {
-        // TODO: move files to updated path
-        fmt.Printf("Images:\n%v\n\n", images)
-        images = []string{}
-      }
+    if a.lastOfCurrentDir(x, audio) {
+      // TODO: move files to updated path
+      fmt.Printf("Images:\n%v\n\n", a.Images)
     }
 
     // debug
@@ -80,8 +76,30 @@ func process(dirEntry string) {
     }
 
   }
+  return nil
 }
 
+func (a *audiocc) processImages(dir string) {
+  a.Images = filesByExtension(dir, imageExts)
+  // TODO: iterate to find best image, then optimize as 'folder.jpg'
+}
+
+// compares paths with DirCur to determine if all files have been processed
+func (a *audiocc) lastOfCurrentDir(i int, paths []string) bool {
+  if i <= len(paths)-1 {
+    last := true
+    if i < len(paths)-1 {
+      ni := getPathInfo(a.DirEntry, paths[i+1])
+      if ni.Dir == a.DirCur {
+        last = false
+      }
+    }
+    return last
+  }
+  return false
+}
+
+// true if --collection & artist path contains " - "
 func skipArtistOnCollection(p string) bool {
   if flagCollection {
     pa := strings.Split(p, string(os.PathSeparator))
