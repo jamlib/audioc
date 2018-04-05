@@ -16,31 +16,24 @@ type info struct {
   Disc, Track, Title string
 }
 
-func infoFromFile(s string) (*info, string) {
-  i := &info{}
+func (i *info) fromFile(s string) *info {
   s = i.matchDate(s)
   s = i.matchDiscTrack(s)
   i.Title = fixWhitespace(matchTitle(s))
 
-  return i, s
+  return i
 }
 
-func infoFromPath(p, sep string) *info {
-  i := &info{}
+func (i *info) fromPath(p, sep string) *info {
   pathArray := strings.Split(p, sep)
+  // start inner-most folder, work out
   for _, s := range reverse(pathArray) {
     if len(s) == 0 {
       continue
     }
-    if len(i.Disc) == 0 {
-      s = i.matchDiscOnly(s)
-    }
-    if len(i.Year) == 0 && len(i.Month) == 0 && len(i.Day) == 0 {
-      s = i.matchDate(s)
-    }
-    if len(i.Year) == 0 {
-      s = i.matchYearOnly(s)
-    }
+    i.matchDiscOnly(s)
+    s = i.matchDate(s)
+    s = i.matchYearOnly(s)
     if len(i.Album) == 0 {
       i.Album = fixWhitespace(s)
     }
@@ -84,7 +77,9 @@ func (i *info) matchYearOnly(s string) string {
   if len(m) < 2 {
     return s
   }
-  i.Year = m[1]
+  if len(i.Year) == 0 {
+    i.Year = m[1]
+  }
   return remain
 }
 
@@ -117,7 +112,9 @@ func (i *info) matchDate(s string) string {
       continue
     }
 
-    i.Year, i.Month, i.Day = year, mon, day
+    if len(i.Year) == 0 || len(i.Month) == 0 || len(i.Day) == 0 {
+      i.Year, i.Month, i.Day = year, mon, day
+    }
     return remain
   }
   return s
@@ -173,13 +170,11 @@ func (i *info) matchDiscTrack(s string) string {
   return s
 }
 
-func (i *info) matchDiscOnly(s string) string {
-  m, remain := regexpMatch(s, `(?i)(cd|disc|set|disk)\s*(?P<disc>\d{1,2})\s*`)
-  if len(m) < 3 {
-    return s
+func (i *info) matchDiscOnly(s string) {
+  m, _ := regexpMatch(s, `(?i)(cd|disc|set|disk)\s*(?P<disc>\d{1,2})\s*`)
+  if len(m) >= 3 && len(i.Disc) == 0 {
+    i.Disc = m[2]
   }
-  i.Disc = m[2]
-  return remain
 }
 
 func regexpMatch(s, regExpStr string) ([]string, string) {

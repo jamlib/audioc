@@ -12,7 +12,8 @@ func TestInfoFromFile(t *testing.T) {
   }
 
   for x := range tests {
-    i, _ := infoFromFile(tests[x][0][0])
+    i := &info{}
+    i.fromFile(tests[x][0][0])
     compare := []string{ i.Year, i.Month, i.Day, i.Disc, i.Track, i.Title }
     if strings.Join(compare, "\n") != strings.Join(tests[x][1], "\n") {
       t.Errorf("Expected %v, got %v", tests[x][1], compare)
@@ -31,7 +32,8 @@ func TestInfoFromPath(t *testing.T) {
   }
 
   for x := range tests {
-    i := infoFromPath(tests[x][0][0], "/")
+    i := &info{}
+    i.fromPath(tests[x][0][0], "/")
     compare := []string{ i.Year, i.Month, i.Day, i.Album }
     if strings.Join(compare, "\n") != strings.Join(tests[x][1], "\n") {
       t.Errorf("Expected %v, got %v", tests[x][1], compare)
@@ -149,19 +151,16 @@ func TestMatchDiscTrack(t *testing.T) {
 
 func TestMatchDiscOnly(t *testing.T) {
   tests := [][]string{
-    { "SET 1", "1", "" },
-    { "disc 02 ", "02", "" },
-    { "yes cd 3 no", "3", "no" },
+    { "SET 1", "1" },
+    { "disc 02 ", "02" },
+    { "yes cd 3 no", "3" },
   }
 
   for x := range tests {
     i := &info{}
-    remain := i.matchDiscOnly(tests[x][0])
+    i.matchDiscOnly(tests[x][0])
     if i.Disc != tests[x][1] {
       t.Errorf("Expected %v, got %v", tests[x][1], i.Disc)
-    }
-    if remain != tests[x][2] {
-      t.Errorf("Expected %v, got %v", tests[x][1], remain)
     }
   }
 }
