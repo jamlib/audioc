@@ -3,10 +3,38 @@ package main
 import (
   "strings"
   "testing"
+
+  "github.com/JamTools/goff/ffprobe"
 )
 
+func TestMatchProbe(t *testing.T) {
+  infos := [][]string{
+    { "Kean College After Midnight", "", "", "" },
+    { "Kean College After Midnight", "", "", "" },
+    { "Kean College After Midnight", "1980", "", "" },
+    { "Kean College After Midnight", "1980", "02", "28" },
+  }
+
+  data := [][]interface{}{
+    { "Different Location", false },
+    { "Kean College After Midnight", true },
+    { "1980 Kean College After Midnight", true },
+    { "1980.02.28 Kean College After Midnight", true },
+  }
+
+  for x, v := range infos {
+    i := &info{ Album: v[0], Year: v[1], Month: v[2], Day: v[3] }
+    p := &ffprobe.Tags{ Album: data[x][0].(string) }
+
+    r := i.matchProbe(p)
+    if r != data[x][1].(bool) {
+      t.Errorf("Expected %v, got %v", data[x][1].(bool), r)
+    }
+  }
+}
+
 func TestInfoFromFile(t *testing.T) {
-    tests := [][][]string{
+  tests := [][][]string{
     { { "sci160318d1_01_Shine" }, { "2016", "03", "18", "1", "01", "Shine" } },
     { { "jgb1980-02-28d1t1 Sugaree" }, { "1980", "02", "28", "1", "1", "Sugaree" } },
   }
@@ -22,10 +50,10 @@ func TestInfoFromFile(t *testing.T) {
 }
 
 func TestInfoFromPath(t *testing.T) {
-    tests := [][][]string{
+  tests := [][][]string{
     {
       { "Jerry Garcia Band/1980/1980.02.28 Kean College After Midnight - FLAC" },
-      { "1980", "02", "28", "Kean College After Midnight - FLAC" },
+      { "1980", "02", "28", "Kean College After Midnight" },
     },{
       { "Grateful Dead/1975/1975 Blues For Allah" }, { "1975", "", "", "Blues For Allah" },
     },
@@ -165,13 +193,16 @@ func TestMatchDiscOnly(t *testing.T) {
   }
 }
 
-func TestMatchTitle(t *testing.T) {
+func TestMatchAlbumOrTitle(t *testing.T) {
   tests := [][]string{
-    { "( ) Silly () (5) []", "Silly" },
+    { "/( ) Silly\\ () (5) []", "Silly" },
+    { "Album - FLAC", "Album" },
+    { ", SBD Album SBD", "SBD Album" },
+    { "!^?Bitrate Album!? -320", "Bitrate Album!?" },
   }
 
   for i := range tests {
-    r := matchTitle(tests[i][0])
+    r := matchAlbumOrTitle(tests[i][0])
     if r != tests[i][1] {
       t.Errorf("Expected %v, got %v", tests[i][1], r)
     }
