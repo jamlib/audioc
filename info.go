@@ -9,6 +9,8 @@ import (
   "regexp"
   "strconv"
   "strings"
+
+  "github.com/JamTools/goff/ffprobe"
 )
 
 type info struct {
@@ -16,10 +18,29 @@ type info struct {
   Disc, Track, Title string
 }
 
+// true if info matches ffprobe.Tags && not --force
+func (i *info) matchProbe(p *ffprobe.Tags) bool {
+  var m string
+  if i.Year == "" {
+    m = i.Album
+  } else {
+    if i.Month == "" && i.Day == "" {
+      m = fmt.Sprintf(`^%s %s$`, i.Year, i.Album )
+    } else {
+      m = fmt.Sprintf(`^%s[-\.]{1}%s[-\.]{1}%s %s$`,
+        i.Year, i.Month, i.Day, i.Album )
+    }
+  }
+  if len(regexp.MustCompile(m).FindString(p.Album)) > 0 {
+    return true
+  }
+  return false
+}
+
 func (i *info) fromFile(s string) *info {
   s = i.matchDate(s)
   s = i.matchDiscTrack(s)
-  i.Title = fixWhitespace(matchTitle(s))
+  i.Title = matchAlbumOrTitle(s)
 
   return i
 }
@@ -35,7 +56,7 @@ func (i *info) fromPath(p, sep string) *info {
     s = i.matchDate(s)
     s = i.matchYearOnly(s)
     if len(i.Album) == 0 {
-      i.Album = fixWhitespace(s)
+      i.Album = matchAlbumOrTitle(s)
     }
   }
   return i
@@ -188,17 +209,25 @@ func regexpMatch(s, regExpStr string) ([]string, string) {
   return m, s
 }
 
-func matchTitle(s string) string {
-  // remove () (1) []
-  s = regexp.MustCompile(`\s*[\[\(]{1}[\d\s]*[\]\)]{1}\s*`).ReplaceAllString(s, "")
+func matchAlbumOrTitle(s string) string {
+  // remove not allowed
+  s = regexp.MustCompile(`[^A-Za-z0-9\-',.!?&> _()]+`).ReplaceAllString(s, "")
 
-  // match only allowed characters
-  s = regexp.MustCompile(`([A-Za-z0-9]|[-',./!?&> ()])+`).FindString(s)
+  // remove () (1)
+  s = regexp.MustCompile(`\s*\({1}[\d\s]*\){1}\s*`).ReplaceAllString(s, "")
+  s = fixWhitespace(s)
+
+  // remove skip file extension " - EXT" from end
+  s = regexp.MustCompile(`\s-*\s(?i)(flac|m4a|mp3|mp4|shn|wav)$`).ReplaceAllString(s, "")
+
+  // remove bitrate/sbd from end
+  s = regexp.MustCompile(`\s*-*\s*(?i)(128|192|256|320|sbd)$`).ReplaceAllString(s, "")
+
+  // remove anything except A-Za-z0-9?! from beginning/end
+  s = regexp.MustCompile(`^[-',.!?&>_]+`).ReplaceAllString(s, "")
+  s = regexp.MustCompile(`[-',.&>_(]+$`).ReplaceAllString(s, "")
 
   return fixWhitespace(s)
-  // replace special chars with -, then remove duplicate - w/whitespace
-  // remove anything except A-Za-z0-9 at beginning or end
-  // remove bitrate/file extension/SBD from end
 }
 
 // replace whitespaces with one space
