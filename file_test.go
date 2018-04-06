@@ -27,23 +27,27 @@ func tmpFile(t *testing.T, input string, f func(in *os.File)) {
   f(in)
 }
 
-func createTestFiles(paths map[string]string, t *testing.T) string {
+func createTestFiles(paths, contents []string, t *testing.T) string {
   td, err := ioutil.TempDir("", "")
   if err != nil {
     t.Fatal(err)
   }
 
-  for p, c := range paths {
-    pa := strings.Split(p, "/")
+  for i := range paths {
+    if len(paths[i]) == 0 {
+      continue
+    }
+
+    pa := strings.Split(paths[i], "/")
     if len(pa) == 0 {
       continue
     }
 
-    path := filepath.Join(td, filepath.Join(pa[:len(pa)-1]...))
+    p := filepath.Join(td, filepath.Join(pa[:len(pa)-1]...))
 
     // create parent dirs
     if len(pa) > 1 {
-      err := os.MkdirAll(path, 0777)
+      err := os.MkdirAll(p, 0777)
       if err != nil {
         t.Fatal(err)
       }
@@ -51,8 +55,8 @@ func createTestFiles(paths map[string]string, t *testing.T) string {
 
     // create file
     if len(pa[len(pa)-1]) > 0 {
-      fullpath := filepath.Join(path, pa[len(pa)-1])
-      err := ioutil.WriteFile(fullpath, []byte(c), 0644)
+      fullpath := filepath.Join(p, pa[len(pa)-1])
+      err := ioutil.WriteFile(fullpath, []byte(contents[i]), 0644)
       if err != nil {
         t.Fatal(err)
       }
@@ -112,12 +116,13 @@ func TestCheckDir(t *testing.T) {
 }
 
 func TestFilesByExtensionImages(t *testing.T) {
-  testFiles := map[string]string{
-    "file1": "",
-    "file2.jpeg": "",
-    "dir1/file3.JPG": "",
-    "dir1/dir2/file4.png": "",
+  testFiles := []string{
+    "file1",
+    "file2.jpeg",
+    "dir1/file3.JPG",
+    "dir1/dir2/file4.png",
   }
+  var contents = make([]string, len(testFiles))
 
   result := []string{
     "dir1/dir2/file4.png",
@@ -125,7 +130,7 @@ func TestFilesByExtensionImages(t *testing.T) {
     "file2.jpeg",
   }
 
-  dir := createTestFiles(testFiles, t)
+  dir := createTestFiles(testFiles, contents, t)
   defer os.RemoveAll(dir)
 
   paths := filesByExtension(dir, imageExts)
@@ -135,15 +140,16 @@ func TestFilesByExtensionImages(t *testing.T) {
 }
 
 func TestFilesByExtensionAudio(t *testing.T) {
-  testFiles := map[string]string{
-    "not audio file": "",
-    "file1.FLAC": "",
-    "file2.m4a": "",
-    "dir1/file3.mp3": "",
-    "dir1/dir2/file4.mp4": "",
-    "dir1/dir2/file5.SHN": "",
-    "dir1/dir2/file6.WAV": "",
+  testFiles := []string{
+    "not audio file",
+    "file1.FLAC",
+    "file2.m4a",
+    "dir1/file3.mp3",
+    "dir1/dir2/file4.mp4",
+    "dir1/dir2/file5.SHN",
+    "dir1/dir2/file6.WAV",
   }
+  var contents = make([]string, len(testFiles))
 
   result := []string{
     "dir1/dir2/file4.mp4",
@@ -154,7 +160,7 @@ func TestFilesByExtensionAudio(t *testing.T) {
     "file2.m4a",
   }
 
-  dir := createTestFiles(testFiles, t)
+  dir := createTestFiles(testFiles, contents, t)
   defer os.RemoveAll(dir)
 
   paths := filesByExtension(dir, audioExts)
@@ -163,6 +169,54 @@ func TestFilesByExtensionAudio(t *testing.T) {
   }
 }
 
+// TODO update this
 func TestSafeFilename(t *testing.T) {
-  // TODO
+  tests := [][]string{
+    { "", "" },
+  }
+
+  for i := range tests {
+    r := safeFilename(tests[i][0])
+    if r != tests[i][1] {
+      t.Errorf("Expected %v, got %v", tests[i][1], r)
+    }
+  }
+}
+
+func TestNthFileSize(t *testing.T) {
+  testFiles := []string{
+    "file1",
+    "file2.jpeg",
+    "dir1/file3.JPG",
+    "dir1/dir2/file4.png",
+  }
+  contents := []string{
+    "abcde", "a", "acddfefsefd", "dfadfd",
+  }
+
+  dir := createTestFiles(testFiles, contents, t)
+  defer os.RemoveAll(dir)
+
+  filesFullpath := []string{}
+  for i := range testFiles {
+    filesFullpath = append(filesFullpath, filepath.Join(dir, testFiles[i]))
+  }
+
+  // test smallest
+  x, _ := nthFileSize(filesFullpath, true)
+  if x != 1 {
+    t.Errorf("Expected %v, got %v", 1, x)
+  }
+
+  // test largest
+  y, _ := nthFileSize(filesFullpath, false)
+  if y != 2 {
+    t.Errorf("Expected %v, got %v", 2, y)
+  }
+
+  // test file not found
+  z, _ := nthFileSize([]string{ "audiocc-file-def-dne" }, false)
+  if z != -1 {
+    t.Errorf("Expected %v, got %v", -1, z)
+  }
 }
