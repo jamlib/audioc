@@ -74,12 +74,42 @@ func filesByExtension(dir string, exts []string) []string {
   if err != nil {
     return []string{}
   }
+  // must sort: nested directories' files list first
+  // char / sorts before A-Za-z0-9
   sort.Strings(files)
 
   return files
 }
 
-// replaces \ & / from proposed file name
+// strip out characters from filename
 func safeFilename(f string) string {
+  // replace / or \ with _
   return regexp.MustCompile(`[\/\\]+`).ReplaceAllString(f, "_")
+}
+
+// index of smallest/largest file in slice of files
+func nthFileSize(files []string, smallest bool) (int, error) {
+  sizes := []int64{}
+
+  found := -1
+  for i := range files {
+    in, err := os.Open(files[i])
+    if err != nil {
+      return -1, err
+    }
+    defer in.Close()
+
+    info, err := in.Stat()
+    if err != nil {
+      return -1, err
+    }
+
+    sizes = append(sizes, info.Size())
+    if found == -1 || (smallest && info.Size() < sizes[found]) ||
+      (!smallest && info.Size() > sizes[found]) {
+      found = i
+    }
+  }
+
+  return found, nil
 }
