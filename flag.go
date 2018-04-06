@@ -24,7 +24,7 @@ Usage: audiocc [OPTIONS] PATH
 Options:
 `
 
-var flagCollection, flagForce, flagSimulate, flagVersion bool
+var flagCollection, flagForce, flagVersion, flagWrite bool
 var flagArtist string
 
 func init() {
@@ -32,8 +32,8 @@ func init() {
   flag.StringVar(&flagArtist, "artist", "", "treat as specific artist")
   flag.BoolVar(&flagCollection, "collection", false, "treat as collection of artists")
   flag.BoolVar(&flagForce, "force", false, "probes all files, even if path looks good")
-  flag.BoolVar(&flagSimulate, "simulate", false, "displays output, does not make changes")
   flag.BoolVar(&flagVersion, "version", false, "print program version, then exit")
+  flag.BoolVar(&flagWrite, "write", false, "write changes to disk")
 
   // --help
   flag.Usage = func() {
