@@ -3,6 +3,7 @@ package main
 import (
   "io"
   "os"
+  "errors"
   "strings"
   "testing"
   "io/ioutil"
@@ -183,12 +184,9 @@ func TestSafeFilename(t *testing.T) {
   }
 }
 
-func TestNthFileSize(t *testing.T) {
+func testFilesFullPath(t *testing.T, f func(files []string)) {
   testFiles := []string{
-    "file1",
-    "file2.jpeg",
-    "dir1/file3.JPG",
-    "dir1/dir2/file4.png",
+    "file1", "file2.jpeg", "dir1/file3.JPG", "dir1/dir2/file4.png",
   }
   contents := []string{
     "abcde", "a", "acddfefsefd", "dfadfd",
@@ -197,26 +195,87 @@ func TestNthFileSize(t *testing.T) {
   dir := createTestFiles(testFiles, contents, t)
   defer os.RemoveAll(dir)
 
-  filesFullpath := []string{}
+  files := []string{}
   for i := range testFiles {
-    filesFullpath = append(filesFullpath, filepath.Join(dir, testFiles[i]))
+    files = append(files, filepath.Join(dir, testFiles[i]))
   }
 
-  // test smallest
-  x, _ := nthFileSize(filesFullpath, true)
-  if x != 1 {
-    t.Errorf("Expected %v, got %v", 1, x)
+  f(files)
+}
+
+func TestNthFileSize(t *testing.T) {
+  tests := []struct {
+    smallest bool
+    result int
+    other string
+  }{
+    { smallest: true, result: 1 },
+    { smallest: false, result: 2 },
+    { result: -1, other: "audiocc-file-def-dne" },
   }
 
-  // test largest
-  y, _ := nthFileSize(filesFullpath, false)
-  if y != 2 {
-    t.Errorf("Expected %v, got %v", 2, y)
-  }
+  testFilesFullPath(t, func(files []string) {
+    for i := range tests {
+      // test file does not exist
+      if len(tests[i].other) > 0 {
+        files = []string{ tests[i].other }
+      }
+      x, _ := nthFileSize(files, tests[i].smallest)
+      if x != tests[i].result {
+        t.Errorf("Expected %v, got %v", tests[i].result, x)
+      }
+    }
+  })
+}
 
-  // test file not found
-  z, _ := nthFileSize([]string{ "audiocc-file-def-dne" }, false)
-  if z != -1 {
-    t.Errorf("Expected %v, got %v", -1, z)
-  }
+func TestIsLarger(t *testing.T) {
+  testFilesFullPath(t, func(files []string) {
+    tests := []struct {
+      src, dest string
+      result bool
+    }{
+      { src: files[0], dest: files[1], result: true },
+      { src: files[1], dest: files[0], result: false },
+      { src: files[2], dest: files[3], result: true },
+      { src: "audiocc-file-def-dne", dest: files[3], result: false },
+    }
+
+    for i := range tests {
+      r := isLarger(tests[i].src, tests[i].dest)
+      if r != tests[i].result {
+        t.Errorf("Expected %v, got %v", tests[i].result, r)
+      }
+    }
+  })
+}
+
+func TestCopyFile(t *testing.T) {
+  testFilesFullPath(t, func(files []string) {
+    // destination dir
+    td, err := ioutil.TempDir("", "")
+    if err != nil {
+      t.Fatal(err)
+    }
+    defer os.RemoveAll(td)
+
+    tests := []struct {
+      src, dest string
+      error error
+    }{
+      { src: files[2], dest: filepath.Join(td, "file1"), error: nil },
+      { src: files[3], dest: filepath.Join(td, "file3"), error: nil },
+      { src: "audiocc-file-def-dne", dest: files[1],
+        error: errors.New("audiocc-file-def-dne") },
+    }
+
+    for i := range tests {
+      e := copyFile(tests[i].src, tests[i].dest)
+      if e == nil && tests[i].error == nil {
+        break
+      }
+      if e.Error() != tests[i].error.Error() {
+        t.Errorf("Expected %#v, got %#v", tests[i].error.Error(), e.Error())
+      }
+    }
+  })
 }
