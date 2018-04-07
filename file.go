@@ -1,6 +1,7 @@
 package main
 
 import (
+  "io"
   "os"
   "fmt"
   "sort"
@@ -112,4 +113,47 @@ func nthFileSize(files []string, smallest bool) (int, error) {
   }
 
   return found, nil
+}
+
+// true if destination does not exist or src has larger file size
+func isLarger(file, newFile string) bool {
+  f, err := os.Open(file)
+  defer f.Close()
+  if err != nil {
+    return false
+  }
+
+  f2, err := os.Open(newFile)
+  defer f2.Close()
+
+  if err == nil {
+    i, _ := nthFileSize([]string{ file, newFile }, false)
+    if i == 1 {
+      return false
+    }
+  }
+
+  return true
+}
+
+func copyFile(srcPath, destPath string) (err error) {
+  srcFile, err := os.Open(srcPath)
+  if err != nil {
+    return
+  }
+  defer srcFile.Close()
+
+  destFile, err := os.Create(destPath)
+  if err != nil {
+    return
+  }
+  defer destFile.Close()
+
+  _, err = io.Copy(destFile, srcFile)
+  if err != nil {
+    return
+  }
+
+  err = destFile.Sync()
+  return
 }
