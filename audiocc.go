@@ -4,70 +4,121 @@ import (
   "os"
   "fmt"
   "log"
+  "image"
   "strings"
 
+  "github.com/JamTools/goff/ffmpeg"
   "github.com/JamTools/goff/ffprobe"
 )
 
 type audiocc struct {
   DirCur, DirEntry string
-  Images []string
+  SkipDir bool
+  Image string
+  Ffmpeg ffmpeger
+  Ffprobe ffprober
+}
+
+type ffmpeger interface {
+  ToMp3(i, q string, m ffmpeg.Metadata, o string) (string, error)
+  OptimizeAlbumArt(s, d string) (string, error)
+  Exec(args ...string) (string, error)
+}
+
+type ffprober interface {
+  GetData(filePath string) (*ffprobe.Data, error)
+  EmbeddedImage() (int, int, bool)
 }
 
 func main() {
   args, cont := processFlags()
   if !cont {
-    os.Exit(1)
+    os.Exit(0)
   }
 
+  if !flagWrite {
+    fmt.Printf("\n* To write changes to disk, please provide flag: --write\n")
+  }
+
+  // ensure path is is valid directory
+  fmt.Printf("\nPath: %v\n\n", args[0])
   dir, err := checkDir(args[0])
   if err != nil {
-    fmt.Printf("Error: %v\n%v\n\n", err.Error(), dir)
-    os.Exit(1)
+    log.Fatal(err)
   }
 
-  fmt.Printf("\nFlag collection: %v\n", flagCollection)
-  if flagArtist != "" {
-    fmt.Printf("Flag artist: %v\n\n", flagArtist)
+  ffm, err := ffmpeg.New()
+  if err != nil {
+    log.Fatal(err)
   }
 
-  fmt.Printf("Path: %v\n\n", dir)
-  a := &audiocc{ DirEntry: dir }
+  ffp, err := ffprobe.New()
+  if err != nil {
+    log.Fatal(err)
+  }
+
+  a := &audiocc{ Ffmpeg: ffm, Ffprobe: ffp, DirEntry: dir }
   err = a.process()
   if err != nil {
     log.Fatal(err)
   }
+
+  fmt.Printf("audiocc finished.\n")
 }
 
 func (a *audiocc) process() error {
+  // iterate through all nested audio extensions within dir
   audio := filesByExtension(a.DirEntry, audioExts)
   for x := range audio {
     pi := getPathInfo(a.DirEntry, audio[x])
 
-    if skipArtistOnCollection(pi.Dir) {
+    // when to skip ahead
+    if skipArtistOnCollection(pi.Dir) || a.SkipDir {
       continue
     }
 
-    if pi.Dir != a.DirCur {
-      // process images once per directory
-      a.processImages(pi.Fulldir)
-      a.DirCur = string(pi.Dir)
-    }
-
+    // info from path & filename
     i := &info{}
     i.fromFile(pi.File)
     i.fromPath(pi.Dir, string(os.PathSeparator))
-    fmt.Printf("Info: %#v\n", i)
 
-    d, err := ffprobe.GetData(pi.Fullpath)
+    // info from embedded tags within audio file
+    d, err := a.Ffprobe.GetData(pi.Fullpath)
     if err != nil {
       return err
     }
+
+    // reset skip on dir change
+    if pi.Dir != a.DirCur {
+      a.SkipDir = false
+    }
+
+    // skip if sources match (unless --force)
+    if i.matchProbe(d.Format.Tags) && !flagForce {
+      a.SkipDir = true
+      continue
+    }
+
+    art := &artwork{ Ffmpeg: a.Ffmpeg, Ffprobe: a.Ffprobe,
+      PathInfo: pi, ImgDecode: image.DecodeConfig }
+
+    // if current dir changed
+    if pi.Dir != a.DirCur {
+      if flagWrite {
+        a.Image, err = art.process()
+        if err != nil {
+          return err
+        }
+      }
+      a.DirCur = string(pi.Dir)
+    }
+
+    // prints
+    fmt.Printf("Info: %#v\n", i)
     fmt.Printf("Tags: %#v\n\n", d.Format.Tags)
 
     if a.lastOfCurrentDir(x, audio) {
       // TODO: move files to updated path
-      fmt.Printf("Images:\n%v\n\n", a.Images)
     }
 
     // debug
@@ -77,11 +128,6 @@ func (a *audiocc) process() error {
 
   }
   return nil
-}
-
-func (a *audiocc) processImages(dir string) {
-  a.Images = filesByExtension(dir, imageExts)
-  // TODO: iterate to find best image, then optimize as 'folder.jpg'
 }
 
 // compares paths with DirCur to determine if all files have been processed
