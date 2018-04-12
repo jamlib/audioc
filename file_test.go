@@ -184,7 +184,7 @@ func TestSafeFilename(t *testing.T) {
   }
 }
 
-func testFilesFullPath(t *testing.T, f func(files []string)) {
+func testFilesFullPath(t *testing.T, f func(dir string, files []string)) {
   testFiles := []string{
     "file1", "file2.jpeg", "dir1/file3.JPG", "dir1/dir2/file4.png",
   }
@@ -200,36 +200,43 @@ func testFilesFullPath(t *testing.T, f func(files []string)) {
     files = append(files, filepath.Join(dir, testFiles[i]))
   }
 
-  f(files)
+  f(dir, files)
 }
 
 func TestNthFileSize(t *testing.T) {
   tests := []struct {
     smallest bool
-    result int
+    result string
     other string
   }{
-    { smallest: true, result: 1 },
-    { smallest: false, result: 2 },
-    { result: -1, other: "audiocc-file-def-dne" },
+    { smallest: true, result: "file2.jpeg" },
+    { smallest: false, result: "dir1/file3.JPG" },
+    { other: "audiocc-file-def-dne", result: "" },
   }
 
-  testFilesFullPath(t, func(files []string) {
+  testFilesFullPath(t, func(dir string, files []string) {
     for i := range tests {
       // test file does not exist
       if len(tests[i].other) > 0 {
         files = []string{ tests[i].other }
       }
-      x, _ := nthFileSize(files, tests[i].smallest)
-      if x != tests[i].result {
-        t.Errorf("Expected %v, got %v", tests[i].result, x)
+      r, err := nthFileSize(files, tests[i].smallest)
+
+      // test errors by setting empty result
+      if err != nil && tests[i].result == "" {
+        continue
+      }
+
+      res := filepath.Join(dir, tests[i].result)
+      if r != res {
+        t.Errorf("Expected %v, got %v", res, r)
       }
     }
   })
 }
 
 func TestIsLarger(t *testing.T) {
-  testFilesFullPath(t, func(files []string) {
+  testFilesFullPath(t, func(dir string, files []string) {
     tests := []struct {
       src, dest string
       result bool
@@ -250,7 +257,7 @@ func TestIsLarger(t *testing.T) {
 }
 
 func TestCopyFile(t *testing.T) {
-  testFilesFullPath(t, func(files []string) {
+  testFilesFullPath(t, func(dir string, files []string) {
     // destination dir
     td, err := ioutil.TempDir("", "")
     if err != nil {

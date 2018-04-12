@@ -67,8 +67,6 @@ func (a *artwork) embedded(width, height int) error {
     return err
   }
 
-  orig := filepath.Join(a.PathInfo.Fulldir, "folder-orig.jpg")
-
   if width > 501 {
     // optimize image
     opt := filepath.Join(a.TempDir, "embedded.jpg")
@@ -78,18 +76,18 @@ func (a *artwork) embedded(width, height int) error {
     }
 
     // use the smallest size
-    sources := []string{ src, opt }
-    i, _ := nthFileSize(sources, true)
+    r, _ := nthFileSize([]string{src, opt}, true)
 
-    // copy original to folder-orig.jpg if larger
-    if i == 1 && isLarger(sources[0], orig) {
-      err = copyFile(sources[0], orig)
+    // if optimized is smaller, copy original to folder-orig.jpg if larger
+    orig := filepath.Join(a.PathInfo.Fulldir, "folder-orig.jpg")
+    if r == opt && isLarger(src, orig) {
+      err = copyFile(src, orig)
       if err != nil {
         return err
       }
     }
 
-    src = sources[i]
+    src = r
   }
 
   err = a.copyAsFolderJpg(src)
@@ -124,14 +122,13 @@ func (a *artwork) fromPath() error {
 
   // if didn't find specific, try largest file size
   if len(imgs) > 0 && len(found) == 0 {
-    i, _ := nthFileSize(imgs, false)
-    found = imgs[i]
+    found, _ = nthFileSize(imgs, false)
   }
   if len(found) == 0 {
     return nil
   }
 
-  // only optimize if width > 501
+  // open image file and determine width/height
   file, err := os.Open(found)
   if err != nil {
     return err
@@ -141,8 +138,9 @@ func (a *artwork) fromPath() error {
     return err
   }
 
+  // only optimize if width > 501
   if img.Width > 501 {
-    // optimize image
+    // optimize through ffmpeg
     opt := filepath.Join(a.TempDir, "path.jpg")
     _, err := a.Ffmpeg.OptimizeAlbumArt(found, opt)
     if err != nil {
@@ -150,9 +148,7 @@ func (a *artwork) fromPath() error {
     }
 
     // use smallest size
-    sources := []string{ found, opt }
-    i, _ := nthFileSize(sources, true)
-    found = sources[i]
+    found, _ = nthFileSize([]string{found, opt}, true)
   }
 
   err = a.copyAsFolderJpg(found)
@@ -168,6 +164,7 @@ func (a *artwork) copyAsFolderJpg(src string) error {
   orig := filepath.Join(a.PathInfo.Fulldir, "folder-orig.jpg")
   folder := filepath.Join(a.PathInfo.Fulldir, "folder.jpg")
 
+  // skip if src already is folder.jpg
   if src == folder {
     return nil
   }

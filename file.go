@@ -89,20 +89,20 @@ func safeFilename(f string) string {
 }
 
 // index of smallest/largest file in slice of files
-func nthFileSize(files []string, smallest bool) (int, error) {
+func nthFileSize(files []string, smallest bool) (string, error) {
   sizes := []int64{}
 
   found := -1
   for i := range files {
     in, err := os.Open(files[i])
     if err != nil {
-      return -1, err
+      return "", err
     }
     defer in.Close()
 
     info, err := in.Stat()
     if err != nil {
-      return -1, err
+      return "", err
     }
 
     sizes = append(sizes, info.Size())
@@ -112,7 +112,10 @@ func nthFileSize(files []string, smallest bool) (int, error) {
     }
   }
 
-  return found, nil
+  if found == -1 {
+    return "", fmt.Errorf("File not found")
+  }
+  return files[found], nil
 }
 
 // true if destination does not exist or src has larger file size
@@ -127,8 +130,8 @@ func isLarger(file, newFile string) bool {
   defer f2.Close()
 
   if err == nil {
-    i, _ := nthFileSize([]string{ file, newFile }, false)
-    if i == 1 {
+    fn, err := nthFileSize([]string{ file, newFile }, false)
+    if err != nil || fn == newFile {
       return false
     }
   }
