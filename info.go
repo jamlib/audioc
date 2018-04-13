@@ -168,8 +168,8 @@ func yearEnsureCentury(year string) string {
 }
 
 var discTrackRegexps = []string{
-  // pattern:^ '1-01 ', '01-02 ', '1-3 - '
-  `^(?P<disc>\d{1,2})-(?P<track>\d{1,2})\s{1}[-]*\s*`,
+  // pattern:^ '1-01 ', '01-02 ', '1-3 - ', '03 - 02 '
+  `^(?P<disc>\d{1,2})\s*-\s*(?P<track>\d{1,2})\s{1}[-]*\s*`,
   // pattern:^ '01 - ', '1 ', '1-' (only track)
   `^(?P<disc>)(?P<track>\d{1,2})\s*[-]*\s*`,
   // pattern: 's01t01', 'd01t01', 's1 01', 'd301', 'd1_01'
@@ -210,6 +210,9 @@ func regexpMatch(s, regExpStr string) ([]string, string) {
 }
 
 func matchAlbumOrTitle(s string) string {
+  // replace / or \ with _
+  s = regexp.MustCompile(`[\/\\]+`).ReplaceAllString(s, "_")
+
   // remove not allowed
   s = regexp.MustCompile(`[^A-Za-z0-9\-',.!?&> _()]+`).ReplaceAllString(s, "")
 

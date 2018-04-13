@@ -37,6 +37,7 @@ func TestInfoFromFile(t *testing.T) {
   tests := [][][]string{
     { { "sci160318d1_01_Shine" }, { "2016", "03", "18", "1", "01", "Shine" } },
     { { "jgb1980-02-28d1t1 Sugaree" }, { "1980", "02", "28", "1", "1", "Sugaree" } },
+    { { "03 - 02 Cold Rain and Snow"}, { "", "", "", "03", "02", "Cold Rain and Snow" } },
   }
 
   for x := range tests {
@@ -199,6 +200,7 @@ func TestMatchAlbumOrTitle(t *testing.T) {
     { "Album - FLAC", "Album" },
     { ", SBD Album SBD", "SBD Album" },
     { "!^?Bitrate Album!? -320", "Bitrate Album!?" },
+    { "intro/crowd", "intro_crowd" },
   }
 
   for i := range tests {
