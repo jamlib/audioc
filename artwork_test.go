@@ -9,11 +9,36 @@ import (
   "path/filepath"
 )
 
-type mockFfmpeg struct {}
+type mockFfmpeg struct {
+  Embedded string
+}
 
-// TODO make file smaller (if possible)
 func (m *mockFfmpeg) OptimizeAlbumArt(s, d string) (string, error) {
-  err := copyFile(s, d)
+  // temp file for optimizing
+  tmp, err := ioutil.TempFile("", "")
+  if err != nil {
+    return "", err
+  }
+  defer os.Remove(tmp.Name())
+  defer tmp.Close()
+
+  b, err := ioutil.ReadFile(s)
+  if err != nil {
+    return "", err
+  }
+
+  // can make smaller
+  contents := string(b)
+  if len(contents) > 0 {
+    _, err = io.WriteString(tmp, contents[:len(contents)-1])
+    if err != nil {
+      return "", err
+    }
+    // use instead of original source
+    s = tmp.Name()
+  }
+
+  err = copyFile(s, d)
   if err != nil {
     return "", err
   }
@@ -21,120 +46,225 @@ func (m *mockFfmpeg) OptimizeAlbumArt(s, d string) (string, error) {
 }
 
 func (m *mockFfmpeg) Exec(args ...string) (string, error) {
+  // hook on extract audio
+  if len(args) == 4 {
+    err := ioutil.WriteFile(args[3], []byte(m.Embedded), 0644)
+    if err != nil {
+      return "", err
+    }
+  }
   return "", nil
 }
 
-func testArtworkFullPath(t *testing.T,
-  testFiles [][]string, f func(dir string, files []string)) {
-
-  filenames := []string{}
-  contents := []string{}
-  for i := range testFiles {
-    if len(testFiles[i]) == 2 {
-      filenames = append(filenames, testFiles[i][0])
-      contents = append(contents, testFiles[i][1])
-    }
-  }
-
-  dir := createTestFiles(filenames, contents, t)
-  defer os.RemoveAll(dir)
-
-  files := []string{}
-  for x := range filenames {
-    files = append(files, filepath.Join(dir, filenames[x]))
-  }
-
-  f(dir, files)
+type mockFfprobe struct {
+  Width int
+  Embedded string
 }
 
-func testFileSize(t *testing.T, src string, size int64) {
-  fi, err := os.Stat(src)
-  if err != nil {
-    t.Fatal(err)
+func (m *mockFfprobe) EmbeddedImage() (int, int, bool) {
+  if len(m.Embedded) > 0 {
+    return m.Width, 0, true
   }
-  if fi.Size() != size {
-    t.Errorf("Expected %v, got %v", size, fi.Size())
-  }
+  return 0, 0, false
 }
 
-func TestFromPath(t *testing.T) {
+func testArtwork(t *testing.T, testFunc func(td, f, fo string)) {
   td, err := ioutil.TempDir("", "")
   if err != nil {
     t.Fatal(err)
   }
   defer os.RemoveAll(td)
 
-  tests := []struct {
-    width int
-    size, sizeOrig int64
-    files [][]string
-  }{
-    { files: [][]string{{}} },
-    { size: 3, files: [][]string{{ "folder.jpg", "abc" }} },
-    { width: 1000, size: 8, sizeOrig: 1,
-      files: [][]string{{ "cover.jpg", "abcdefgh" }, { "folder-orig.jpg", "a" }},
-    },
-  }
-
-  for i := range tests {
-    imageDecode := func (r io.Reader) (image.Config, string, error) {
-      c := image.Config{ Width: tests[i].width }
-      return c, "", nil
-    }
-
-    a := &artwork{ Ffmpeg: &mockFfmpeg{}, TempDir: td, ImgDecode: imageDecode }
-
-    testArtworkFullPath(t, tests[i].files, func(dir string, files []string) {
-      a.PathInfo = &pathInfo{ Fulldir: dir }
-      err = a.fromPath()
-      if err != nil {
-        t.Fatal(err)
-      }
-
-      if len(files) > 0 {
-        testFileSize(t, files[0], tests[i].size)
-      }
-      if len(files) > 1 {
-        testFileSize(t, files[1], tests[i].sizeOrig)
-      }
-    })
-  }
+  testFunc(td, "folder.jpg", "folder-orig.jpg")
 }
 
-func TestCopyAsFolderJpg(t *testing.T) {
-  testFiles := [][]string{
-    { "file1.jpg", "abcde" },
-    { "file2.jpeg", "a" },
-    { "dir1/file3.JPG", "acddfefsefd" },
-    { "dir1/dir2/file4.png", "dfadfd" },
+func testArtworkFiles(t *testing.T,
+  testFiles map[string]string, testFunc func(dir string)) {
+
+  files := []string{}
+  contents := []string{}
+  for k, v := range testFiles {
+    files = append(files, k)
+    contents = append(contents, v)
   }
 
-  testArtworkFullPath(t, testFiles, func(dir string, files []string) {
+  dir := createTestFiles(files, contents, t)
+  defer os.RemoveAll(dir)
+
+  testFunc(dir)
+}
+
+func TestProcess(t *testing.T) {
+  testArtwork(t, func(td, f, fo string) {
     tests := []struct {
-      index int
-      size, sizeOrig int64
-      files [][]string
+      width int
+      embedded string
+      files, results map[string]string
     }{
-      { index: 3, size: 6, sizeOrig: 3,
-        files: [][]string{{ "folder.jpg", "abc" }, { "folder-orig.jpg", "ab" }},
-      }, {
-        index: 2, size: 11, sizeOrig: 8,
-        files: [][]string{{ "folder.jpg", "abc" }, { "folder-orig.jpg", "sdgyhrdw" }},
+      { width: 1000, embedded: "123",
+        files: map[string]string{ f: "abcdefgh", fo: "a" },
+        results: map[string]string{ f: "12", fo: "abcdefgh" },
+      },{
+        width: 0,
+        files: map[string]string{ f: "abcdefgh", fo: "a" },
+        results: map[string]string{ f: "abcdefgh", fo: "a" },
       },
     }
 
     for i := range tests {
-      testArtworkFullPath(t, tests[i].files, func(dir2 string, files2 []string) {
-        a := &artwork{ PathInfo: &pathInfo{ Fulldir: dir2 } }
-        err := a.copyAsFolderJpg(files[tests[i].index])
+      imageDecode := func (r io.Reader) (image.Config, string, error) {
+        c := image.Config{ Width: tests[i].width }
+        return c, "", nil
+      }
+
+      a := &artwork{ TempDir: td,
+        Ffmpeg: &mockFfmpeg{ Embedded: tests[i].embedded }, ImgDecode: imageDecode,
+        Ffprobe: &mockFfprobe{ Width: tests[i].width, Embedded: tests[i].embedded } }
+
+      testArtworkFiles(t, tests[i].files, func(dir string) {
+        a.PathInfo = &pathInfo{ Fulldir: dir }
+
+        _, err := a.process()
         if err != nil {
           t.Fatal(err)
         }
 
-        testFileSize(t, files2[0], tests[i].size)
-        testFileSize(t, files2[1], tests[i].sizeOrig)
+        for k, v := range tests[i].results {
+          b, _ := ioutil.ReadFile(filepath.Join(dir, k))
+          if string(b) != v {
+            t.Errorf("Expected %v, got %v", v, string(b))
+          }
+        }
       })
     }
   })
+}
 
+func TestEmbedded(t *testing.T) {
+  testArtwork(t, func(td, f, fo string) {
+    tests := []struct {
+      width int
+      embedded string
+      files, results map[string]string
+    }{
+      { width: 1000, embedded: "123",
+        files: map[string]string{ f: "abcdefgh", fo: "a" },
+        results: map[string]string{ f: "12", fo: "abcdefgh" },
+      },{
+        width: 500, embedded: "123",
+        files: map[string]string{ f: "abcdefgh", fo: "a" },
+        results: map[string]string{ f: "123", fo: "abcdefgh" },
+      },
+    }
+
+    for i := range tests {
+      a := &artwork{ Ffmpeg: &mockFfmpeg{ Embedded: tests[i].embedded }, TempDir: td }
+
+      testArtworkFiles(t, tests[i].files, func(dir string) {
+        a.PathInfo = &pathInfo{ Fulldir: dir }
+
+        err := a.embedded(tests[i].width, 1)
+        if err != nil {
+          t.Fatal(err)
+        }
+
+        for k, v := range tests[i].results {
+          b, _ := ioutil.ReadFile(filepath.Join(dir, k))
+          if string(b) != v {
+            t.Errorf("Expected %v, got %v", v, string(b))
+          }
+        }
+      })
+    }
+  })
+}
+
+func TestFromPath(t *testing.T) {
+  testArtwork(t, func(td, f, fo string) {
+    tests := []struct {
+      width int
+      files, results map[string]string
+    }{
+      { files: map[string]string{},
+        results: map[string]string{},
+      },{
+        files: map[string]string{ f: "abc" },
+        results: map[string]string{ f: "abc" },
+      },{
+        width: 1000,
+        files: map[string]string{ "cover.jpg": "abcdefgh", fo: "a" },
+        results: map[string]string{ f: "abcdefg", fo: "a" },
+      },
+    }
+
+    for i := range tests {
+      imageDecode := func (r io.Reader) (image.Config, string, error) {
+        c := image.Config{ Width: tests[i].width }
+        return c, "", nil
+      }
+
+      a := &artwork{ Ffmpeg: &mockFfmpeg{}, TempDir: td, ImgDecode: imageDecode }
+
+      testArtworkFiles(t, tests[i].files, func(dir string) {
+        a.PathInfo = &pathInfo{ Fulldir: dir }
+
+        err := a.fromPath()
+        if err != nil {
+          t.Fatal(err)
+        }
+
+        for k, v := range tests[i].results {
+          b, _ := ioutil.ReadFile(filepath.Join(dir, k))
+          if string(b) != v {
+            t.Errorf("Expected %v, got %v", v, string(b))
+          }
+        }
+      })
+    }
+  })
+}
+
+func TestCopyAsFolderJpg(t *testing.T) {
+  testArtwork(t, func(td, f, fo string) {
+    testFiles := map[string]string{
+      "file1.jpg": "abcde",
+      "file2.jpeg": "a",
+      "dir1/file3.JPG": "acddfefsefd",
+      "dir1/dir2/file4.png": "dfadfd",
+    }
+
+    testArtworkFiles(t, testFiles, func(dir string) {
+      tests := []struct {
+        key string
+        files, results map[string]string
+      }{
+        { key: "dir1/dir2/file4.png",
+          files: map[string]string{ f: "abc", fo: "ab" },
+          results: map[string]string{ f: "dfadfd", fo: "abc" },
+        },{
+          key: "dir1/file3.JPG",
+          files: map[string]string{ f: "abc", fo: "sdgyhrdw" },
+          results: map[string]string{ f: "acddfefsefd", fo: "sdgyhrdw" },
+        },
+      }
+
+      for i := range tests {
+        testArtworkFiles(t, tests[i].files, func(dir2 string) {
+          a := &artwork{ PathInfo: &pathInfo{ Fulldir: dir2 } }
+
+          err := a.copyAsFolderJpg(filepath.Join(dir, tests[i].key))
+          if err != nil {
+            t.Fatal(err)
+          }
+
+          for k, v := range tests[i].results {
+            b, _ := ioutil.ReadFile(filepath.Join(dir2, k))
+            if string(b) != v {
+              t.Errorf("Expected %v, got %v", v, string(b))
+            }
+          }
+        })
+      }
+    })
+  })
 }

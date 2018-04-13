@@ -27,7 +27,6 @@ type artwork struct {
 }
 
 // uses optimized embedded artwork OR optimized artwork within file path
-// TODO: tests
 func (a *artwork) process() (string, error) {
   // create temporary directory to work out of
   td, err := ioutil.TempDir("", "")
@@ -38,7 +37,7 @@ func (a *artwork) process() (string, error) {
   a.TempDir = td
 
   // if file has embedded artwork, extract & optimize
-  w, h, has := a.Ffprobe.EmbeddedImage() 
+  w, h, has := a.Ffprobe.EmbeddedImage()
   if has {
     err = a.embedded(w, h)
     if err != nil {
@@ -58,7 +57,6 @@ func (a *artwork) process() (string, error) {
 }
 
 // extract & optimize embedded artwork
-// TODO: tests
 func (a *artwork) embedded(width, height int) error {
   // extract image with ffmpeg
   src := filepath.Join(a.TempDir, "embedded-orig.jpg")
@@ -95,6 +93,7 @@ func (a *artwork) embedded(width, height int) error {
     return err
   }
 
+  a.Source = filepath.Join(a.PathInfo.Fulldir, "folder.jpg")
   return nil
 }
 
