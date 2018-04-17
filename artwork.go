@@ -77,9 +77,8 @@ func (a *artwork) embedded(width, height int) error {
     r, _ := nthFileSize([]string{src, opt}, true)
 
     // if optimized is smaller, copy original to folder-orig.jpg if larger
-    orig := filepath.Join(a.PathInfo.Fulldir, "folder-orig.jpg")
-    if r == opt && isLarger(src, orig) {
-      err = copyFile(src, orig)
+    if r == opt {
+      err = a.copyAsFolderOrigJpg(src)
       if err != nil {
         return err
       }
@@ -93,7 +92,6 @@ func (a *artwork) embedded(width, height int) error {
     return err
   }
 
-  a.Source = filepath.Join(a.PathInfo.Fulldir, "folder.jpg")
   return nil
 }
 
@@ -158,9 +156,20 @@ func (a *artwork) fromPath() error {
   return nil
 }
 
+// copy src to folder-orig.jpg if larger
+func (a *artwork) copyAsFolderOrigJpg(src string) error {
+  orig := filepath.Join(a.PathInfo.Fulldir, "folder-orig.jpg")
+  if isLarger(src, orig) {
+    err := copyFile(src, orig)
+    if err != nil {
+      return err
+    }
+  }
+  return nil
+}
+
 // update folder.jpg & folder-orig.jpg
 func (a *artwork) copyAsFolderJpg(src string) error {
-  orig := filepath.Join(a.PathInfo.Fulldir, "folder-orig.jpg")
   folder := filepath.Join(a.PathInfo.Fulldir, "folder.jpg")
 
   // skip if src already is folder.jpg
@@ -169,18 +178,17 @@ func (a *artwork) copyAsFolderJpg(src string) error {
   }
 
   // copy folder.jpg to folder-orig.jpg if larger
-  if isLarger(folder, orig) {
-    err := copyFile(folder, orig)
-    if err != nil {
-      return err
-    }
-  }
-
-  // copy to folder.jpg
-  err := copyFile(src, folder)
+  err := a.copyAsFolderOrigJpg(folder)
   if err != nil {
     return err
   }
 
+  // copy to folder.jpg
+  err = copyFile(src, folder)
+  if err != nil {
+    return err
+  }
+
+  a.Source = folder
   return nil
 }

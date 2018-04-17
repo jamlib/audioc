@@ -224,6 +224,7 @@ func TestFromPath(t *testing.T) {
   })
 }
 
+// also covers: copyAsFolderOrigJpg
 func TestCopyAsFolderJpg(t *testing.T) {
   testArtwork(t, func(td, f, fo string) {
     testFiles := map[string]string{
