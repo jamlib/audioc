@@ -18,7 +18,7 @@ type info struct {
   Disc, Track, Title string
 }
 
-// true if info matches ffprobe.Tags && not --force
+// true if info matches ffprobe.Tags
 func (i *info) matchProbe(p *ffprobe.Tags) bool {
   var m string
   if i.Year == "" {
@@ -32,9 +32,19 @@ func (i *info) matchProbe(p *ffprobe.Tags) bool {
     }
   }
   if len(regexp.MustCompile(m).FindString(p.Album)) > 0 {
+    // TODO: also check disc, track, title
     return true
   }
   return false
+}
+
+func (i *info) fromAlbum(s string) {
+  i.matchDiscOnly(s)
+  s = i.matchDate(s)
+  s = i.matchYearOnly(s)
+  if len(i.Album) == 0 {
+    i.Album = matchAlbumOrTitle(s)
+  }
 }
 
 func (i *info) fromFile(s string) *info {
@@ -46,18 +56,12 @@ func (i *info) fromFile(s string) *info {
 }
 
 func (i *info) fromPath(p, sep string) *info {
-  pathArray := strings.Split(p, sep)
   // start inner-most folder, work out
-  for _, s := range reverse(pathArray) {
+  for _, s := range reverse(strings.Split(p, sep)) {
     if len(s) == 0 {
       continue
     }
-    i.matchDiscOnly(s)
-    s = i.matchDate(s)
-    s = i.matchYearOnly(s)
-    if len(i.Album) == 0 {
-      i.Album = matchAlbumOrTitle(s)
-    }
+    i.fromAlbum(s)
   }
   return i
 }
@@ -185,6 +189,11 @@ func (i *info) matchDiscTrack(s string) string {
       continue
     }
 
+    // remove prefix 0s
+    for x := range m {
+      m[x] = regexp.MustCompile(`^0+`).ReplaceAllString(m[x], "")
+    }
+
     i.Disc, i.Track = m[1], m[2]
     return r
   }
@@ -210,25 +219,31 @@ func regexpMatch(s, regExpStr string) ([]string, string) {
 }
 
 func matchAlbumOrTitle(s string) string {
-  // replace / or \ with _
-  s = regexp.MustCompile(`[\/\\]+`).ReplaceAllString(s, "_")
+  // replace / or \ with -
+  s = regexp.MustCompile(`[\/\\]+`).ReplaceAllString(s, "-")
 
-  // remove not allowed
-  s = regexp.MustCompile(`[^A-Za-z0-9\-',.!?&> _()]+`).ReplaceAllString(s, "")
+  // only these chars allowed: A-Za-z0-9-',.!?&> _()
+  // remove all others
+  s = regexp.MustCompile(`[^A-Za-z0-9-',.!?&> _()]+`).ReplaceAllString(s, "")
 
   // remove () (1)
   s = regexp.MustCompile(`\s*\({1}[\d\s]*\){1}\s*`).ReplaceAllString(s, "")
   s = fixWhitespace(s)
 
-  // remove skip file extension " - EXT" from end
+  // remove file extension from end
   s = regexp.MustCompile(`\s-*\s(?i)(flac|m4a|mp3|mp4|shn|wav)$`).ReplaceAllString(s, "")
 
   // remove bitrate/sbd from end
   s = regexp.MustCompile(`\s*-*\s*(?i)(128|192|256|320|sbd)$`).ReplaceAllString(s, "")
 
-  // remove anything except A-Za-z0-9?! from beginning/end
-  s = regexp.MustCompile(`^[-',.!?&>_]+`).ReplaceAllString(s, "")
+  // from beginning: remove anything except A-Za-z0-9(
+  s = regexp.MustCompile(`^[-',.&>_)!?]+`).ReplaceAllString(s, "")
+
+  // from end: remove anything except A-Za-z0-9)?!
   s = regexp.MustCompile(`[-',.&>_(]+$`).ReplaceAllString(s, "")
+
+  // replace _ with space
+  s = regexp.MustCompile(`[_]+`).ReplaceAllString(s, " ")
 
   return fixWhitespace(s)
 }
