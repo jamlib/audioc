@@ -35,9 +35,9 @@ func TestMatchProbe(t *testing.T) {
 
 func TestInfoFromFile(t *testing.T) {
   tests := [][][]string{
-    { { "sci160318d1_01_Shine" }, { "2016", "03", "18", "1", "01", "Shine" } },
+    { { "sci160318d1_01_Shine" }, { "2016", "03", "18", "1", "1", "Shine" } },
     { { "jgb1980-02-28d1t1 Sugaree" }, { "1980", "02", "28", "1", "1", "Sugaree" } },
-    { { "03 - 02 Cold Rain and Snow"}, { "", "", "", "03", "02", "Cold Rain and Snow" } },
+    { { "03 - 02 Cold Rain and Snow"}, { "", "", "", "3", "2", "Cold Rain and Snow" } },
   }
 
   for x := range tests {
@@ -156,16 +156,16 @@ func TestYearEnsureCentury(t *testing.T) {
 func TestMatchDiscTrack(t *testing.T) {
   tests := [][][]string{
     { { "not a track" }, { "", "", "not a track" } },
-    { { "1-01 " }, { "1", "01", "" } },
-    { { "01-02 Album" }, { "01", "02", "Album" } },
+    { { "1-01 " }, { "1", "1", "" } },
+    { { "01-02 Album" }, { "1", "2", "Album" } },
     { { "1-3 - Venue" }, { "1", "3", "Venue" } },
     { { "1-Label" }, { "", "1", "Label" } },
-    { { "01 - City" }, { "", "01", "City" } },
-    { { "s01t01" }, { "01", "01", "" } },
-    { { "d01t02" }, { "01", "02", "" } },
-    { { "s2 01" }, { "2", "01", "" } },
-    { { "d301" }, { "3", "01", "" } },
-    { { "d2_05" }, { "2", "05", "" } },
+    { { "01 - City" }, { "", "1", "City" } },
+    { { "s01t01" }, { "1", "1", "" } },
+    { { "d01t02" }, { "1", "2", "" } },
+    { { "s2 01" }, { "2", "1", "" } },
+    { { "d301" }, { "3", "1", "" } },
+    { { "d2_05" }, { "2", "5", "" } },
   }
 
   for x := range tests {
@@ -200,7 +200,7 @@ func TestMatchAlbumOrTitle(t *testing.T) {
     { "Album - FLAC", "Album" },
     { ", SBD Album SBD", "SBD Album" },
     { "!^?Bitrate Album!? -320", "Bitrate Album!?" },
-    { "intro/crowd", "intro_crowd" },
+    { "intro/crowd", "intro-crowd" },
   }
 
   for i := range tests {
