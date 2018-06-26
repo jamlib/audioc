@@ -4,8 +4,17 @@ import (
   "testing"
 )
 
+// TODO: fully test process()
+
+func TestProcessDirDNE(t *testing.T) {
+  a := &audiocc{ DirEntry: "audiocc-dir-def-dne" }
+  err := a.process()
+  if err == nil {
+    t.Errorf("Expected error, got none.")
+  }
+}
+
 func TestLastOfCurrentDir(t *testing.T) {
-  a := &audiocc{ DirEntry: "/anything" }
   paths := []string{
     "/anything/nest/file3.ext",
     "/anything/nest/file4.ext",
@@ -20,10 +29,12 @@ func TestLastOfCurrentDir(t *testing.T) {
     { "anything": true },
   }
 
+  a := &audiocc{ DirEntry: "/anything", Files: paths }
+
   for i := range tests {
     for k, v := range tests[i] {
       a.DirCur = k
-      r := a.lastOfCurrentDir(i, paths)
+      r := a.lastOfCurrentDir(i)
       if r != v {
         t.Errorf("Expected %v, got %v", v, r)
       }
@@ -33,8 +44,8 @@ func TestLastOfCurrentDir(t *testing.T) {
 }
 
 func TestLastOfCurrentDirBounds(t *testing.T) {
-  a := &audiocc{}
-  r := a.lastOfCurrentDir(1, []string{})
+  a := &audiocc{ Files: []string{} }
+  r := a.lastOfCurrentDir(1)
   if r != false {
     t.Errorf("Expected %v, got %v", false, r)
   }
