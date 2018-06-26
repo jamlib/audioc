@@ -84,8 +84,7 @@ func filesByExtension(dir string, exts []string) []string {
 
 // strip out characters from filename
 func safeFilename(f string) string {
-  // replace / or \ with _
-  return regexp.MustCompile(`[\/\\]+`).ReplaceAllString(f, "_")
+  return regexp.MustCompile(`[^A-Za-z0-9-'!?& _()]+`).ReplaceAllString(f, "")
 }
 
 // index of smallest/largest file in slice of files
