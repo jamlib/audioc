@@ -18,24 +18,46 @@ type info struct {
   Disc, Track, Title string
 }
 
-// true if info matches ffprobe.Tags
-func (i *info) matchProbe(p *ffprobe.Tags) bool {
-  var m string
-  if i.Year == "" {
-    m = i.Album
-  } else {
-    if i.Month == "" && i.Day == "" {
-      m = fmt.Sprintf(`^%s %s$`, i.Year, i.Album )
-    } else {
-      m = fmt.Sprintf(`^%s[-\.]{1}%s[-\.]{1}%s %s$`,
-        i.Year, i.Month, i.Day, i.Album )
+// compare info against ffprobe.Tags and combine into best info
+func (i *info) matchProbeTags(p *ffprobe.Tags) (*info, bool) {
+  tagInfo := &info{
+    Disc: p.Disc,
+    Track: p.Track,
+    Title: matchAlbumOrTitle(p.Title),
+  }
+  tagInfo.fromAlbum(p.Album)
+
+  compare := tagInfo
+  compare.Title = safeFilename(compare.Title)
+  if *i != *compare {
+    // combine infos
+    result := tagInfo
+    if len(result.Album) < len(i.Album) {
+      result.Album = i.Album
     }
+    if len(result.Year) == 0 {
+      result.Year = i.Year
+    }
+    if len(result.Month) == 0 {
+      result.Month = i.Month
+    }
+    if len(result.Day) == 0 {
+      result.Day = i.Day
+    }
+    if len(result.Disc) == 0 {
+      result.Disc = i.Disc
+    }
+    if len(result.Track) == 0 {
+      result.Track = i.Track
+    }
+    if len(result.Title) < len(i.Title) {
+      result.Title = i.Title
+    }
+
+    return result, false
   }
-  if len(regexp.MustCompile(m).FindString(p.Album)) > 0 {
-    // TODO: also check disc, track, title
-    return true
-  }
-  return false
+
+  return i, true
 }
 
 func (i *info) fromAlbum(s string) {
