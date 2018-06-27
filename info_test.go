@@ -7,28 +7,38 @@ import (
   "github.com/JamTools/goff/ffprobe"
 )
 
-func TestMatchProbe(t *testing.T) {
-  infos := [][]string{
-    { "Kean College After Midnight", "", "", "" },
-    { "Kean College After Midnight", "", "", "" },
-    { "Kean College After Midnight", "1980", "", "" },
-    { "Kean College After Midnight", "1980", "02", "28" },
+func TestMatchProbeTags(t *testing.T) {
+  tests := []struct {
+    info, comb *info
+    tags *ffprobe.Tags
+    match bool
+  }{
+    { info: &info{ Album: "Kean College After Midnight", Title: "After Midnight" },
+      tags: &ffprobe.Tags{ Album: "Something Else" },
+      comb: &info{ Album: "Kean College After Midnight", Title: "After Midnight" },
+      match: false,
+    },{
+      info: &info{ Album: "Kean College After Midnight", Year: "1980" },
+      tags: &ffprobe.Tags{ Album: "1980 Kean College After Midnight" },
+      comb: &info{ Album: "Kean College After Midnight", Year: "1980" },
+      match: true,
+    },{
+      info: &info{ Album: "Kean College After Midnight", Year: "1980" },
+      tags: &ffprobe.Tags{ Album: "1980.02.28 Kean College After Midnight" },
+      comb: &info{ Album: "Kean College After Midnight", Year: "1980", Month: "02", Day: "28" },
+      match: false,
+    },
   }
 
-  data := [][]interface{}{
-    { "Different Location", false },
-    { "Kean College After Midnight", true },
-    { "1980 Kean College After Midnight", true },
-    { "1980.02.28 Kean College After Midnight", true },
-  }
+  for x := range tests {
+    rInfo, match := tests[x].info.matchProbeTags(tests[x].tags)
 
-  for x, v := range infos {
-    i := &info{ Album: v[0], Year: v[1], Month: v[2], Day: v[3] }
-    p := &ffprobe.Tags{ Album: data[x][0].(string) }
+    if *rInfo != *tests[x].comb {
+      t.Errorf("Expected %v, got %v", rInfo, tests[x].comb)
+    }
 
-    r := i.matchProbe(p)
-    if r != data[x][1].(bool) {
-      t.Errorf("Expected %v, got %v", data[x][1].(bool), r)
+    if match != tests[x].match {
+      t.Errorf("Expected %v, got %v", match, tests[x].match)
     }
   }
 }
