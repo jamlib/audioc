@@ -189,3 +189,27 @@ func copyFile(srcPath, destPath string) (err error) {
   err = destFile.Sync()
   return
 }
+
+// if dir already exists, prepend (x) to folder name
+// increment (x) until dir not found
+func renameFolder(src, dest string) (string, error) {
+  _, err := os.Stat(dest)
+  if err == nil {
+    x := 1
+    found := true
+    for found {
+      newDir := fmt.Sprintf("%v (%v)", dest, x)
+
+      _, err := os.Stat(newDir)
+      if err != nil {
+        dest = newDir
+        found = false
+      }
+
+      x += 1
+    }
+  }
+
+  err = os.Rename(src, dest)
+  return dest, err
+}
