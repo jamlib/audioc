@@ -331,3 +331,33 @@ func TestCopyFile(t *testing.T) {
     }
   })
 }
+
+func TestRenameFolder(t *testing.T) {
+  testFiles := []string{
+    "dir1/file1", "dir2/file2", "dir3/file3", "dir4/file4",
+  }
+  contents := []string{
+    "abcde", "a", "", "",
+  }
+
+  dir := createTestFiles(testFiles, contents, t)
+  defer os.RemoveAll(dir)
+
+  tests := [][]string{
+    {"dir2", "dir1", "dir1 (1)"},
+    {"dir3", "dir1", "dir1 (2)"},
+    {"dir4", "dir5", "dir5"},
+  }
+
+  for i := 0; i < len(tests); i++ {
+    r, err := renameFolder(filepath.Join(dir, tests[i][0]), filepath.Join(dir, tests[i][1]))
+    if err != nil {
+      t.Errorf("Unexpected error %v", err.Error())
+    }
+
+    exp := filepath.Join(dir, tests[i][2])
+    if r != exp {
+      t.Errorf("Expected %v, got %v", exp, r)
+    }
+  }
+}
