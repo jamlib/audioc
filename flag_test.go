@@ -7,7 +7,7 @@ import (
 
 func TestProcessFlagsVersion(t *testing.T) {
   os.Args = []string{"audiocc", "-version"}
-  defer func() { flagVersion = false }()
+  defer func() { flags.Version = false }()
 
   if _, cont := processFlags(); cont == true {
     t.Errorf("Expected %v, got %v", false, cont)
@@ -32,20 +32,20 @@ func TestProcessFlagsNoArtistOrCollection(t *testing.T) {
 
 func TestProcessFlagsArtist(t *testing.T) {
   os.Args = []string{"audiocc", "--artist", "Grateful Dead", "."}
-  defer func() { flagArtist = "" }()
+  defer func() { flags.Artist = "" }()
 
   _, cont := processFlags()
   if cont == false {
     t.Errorf("Expected %v, got %v", true, cont)
   }
-  if flagArtist != os.Args[2] {
-    t.Errorf("Expected %v, got %v", os.Args[2], flagArtist)
+  if flags.Artist != os.Args[2] {
+    t.Errorf("Expected %v, got %v", os.Args[2], flags.Artist)
   }
 }
 
 func TestProcessFlagsCollection(t *testing.T) {
   os.Args = []string{"audiocc", "--collection", "."}
-  defer func() { flagCollection = false }()
+  defer func() { flags.Collection = false }()
 
   _, cont := processFlags()
   if cont == false {
