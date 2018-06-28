@@ -41,7 +41,7 @@ func (a *artwork) process() (string, error) {
   if has {
     err = a.embedded(w, h)
     if err != nil {
-      fmt.Printf("Error: %v\n\n", err.Error())
+      fmt.Printf("\nNo embedded artwork found.\n")
     }
   }
 
@@ -49,11 +49,11 @@ func (a *artwork) process() (string, error) {
   if len(a.Source) == 0 {
     err = a.fromPath()
     if err != nil {
-      fmt.Printf("Error: %v\n\n", err.Error())
+      fmt.Printf("\nNo artwork image files found.\n")
     }
   }
 
-  return "", nil
+  return a.Source, nil
 }
 
 // extract & optimize embedded artwork
