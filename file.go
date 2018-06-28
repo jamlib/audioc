@@ -30,7 +30,7 @@ func getPathInfo(base, path string) *pathInfo {
   }
   pi.Dir = strings.TrimPrefix(pi.Dir, string(os.PathSeparator))
 
-  pi.Ext = filepath.Ext(pi.File)
+  pi.Ext = strings.ToLower(filepath.Ext(pi.File))
   pi.File = strings.TrimSuffix(pi.File, pi.Ext)
 
   return pi
