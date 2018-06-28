@@ -24,16 +24,23 @@ Usage: audiocc [OPTIONS] PATH
 Options:
 `
 
-var flagCollection, flagForce, flagVersion, flagWrite bool
-var flagArtist string
+type Flags struct {
+  Artist, Bitrate, ModTime string
+  Collection, Fast, Force, Version, Write bool
+}
+
+var flags = Flags{}
 
 func init() {
   // setup options
-  flag.StringVar(&flagArtist, "artist", "", "treat as specific artist")
-  flag.BoolVar(&flagCollection, "collection", false, "treat as collection of artists")
-  flag.BoolVar(&flagForce, "force", false, "probes all files, even if path looks good")
-  flag.BoolVar(&flagVersion, "version", false, "print program version, then exit")
-  flag.BoolVar(&flagWrite, "write", false, "write changes to disk")
+  flag.StringVar(&flags.Artist, "artist", "", "treat as specific artist")
+  flag.StringVar(&flags.Bitrate, "bitrate", "V0", "convert to mp3 (V0=variable 256kbps, 320=constant 320kbps)")
+  flag.BoolVar(&flags.Collection, "collection", false, "treat as collection of artists")
+  flag.BoolVar(&flags.Force, "force", false, "processes all files, even if path info matches tag info")
+  flag.BoolVar(&flags.Fast, "fast", false, "skips album directory if starts w/ {year}")
+  flag.StringVar(&flags.ModTime, "modtime", "", "set modified timestamp of updated files")
+  flag.BoolVar(&flags.Version, "version", false, "print program version, then exit")
+  flag.BoolVar(&flags.Write, "write", false, "write changes to disk")
 
   // --help
   flag.Usage = func() {
@@ -49,7 +56,7 @@ func processFlags() ([]string, bool) {
   a := flag.Args()
 
   // --version
-  if flagVersion {
+  if flags.Version {
     fmt.Printf("%s\n", version)
     return a, false
   }
@@ -61,10 +68,15 @@ func processFlags() ([]string, bool) {
   }
 
   // must specify --artist OR --collection
-  if flagArtist == "" && !flagCollection {
+  if flags.Artist == "" && !flags.Collection {
     fmt.Printf("\nError: Must provide option --artist OR --collection\n")
     flag.Usage()
     return a, false
+  }
+
+  // default to V0 unless 320 specified
+  if flags.Bitrate != "320" {
+    flags.Bitrate = "V0"
   }
 
   return a, true
