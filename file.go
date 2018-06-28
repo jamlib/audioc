@@ -82,6 +82,36 @@ func filesByExtension(dir string, exts []string) []string {
   return files
 }
 
+// group sorted files by common directory
+func bundleFiles(dir string, files []string, f func(bundle []int) error) error {
+  dirCur := ""
+  bundle := []int{}
+  files = append(files, "")
+
+  for x := range files {
+    pi := getPathInfo(dir, files[x])
+
+    if dirCur == "" {
+      dirCur = string(pi.Dir)
+    }
+
+    // if dir changes or last of all files
+    if pi.Dir != dirCur || x == len(files)-1 {
+      err := f(bundle)
+      if err != nil {
+        return err
+      }
+
+      bundle = []int{}
+      dirCur = string(pi.Dir)
+    }
+
+    bundle = append(bundle, x)
+  }
+
+  return nil
+}
+
 // strip out characters from filename
 func safeFilename(f string) string {
   return regexp.MustCompile(`[^A-Za-z0-9-'!?& _()]+`).ReplaceAllString(f, "")
