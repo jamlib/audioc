@@ -7,6 +7,45 @@ import (
   "github.com/JamTools/goff/ffprobe"
 )
 
+func TestToAlbum(t *testing.T) {
+  tests := []struct {
+    i *info
+    result string
+  }{
+    { i: &info{ Year: "2004", Month: "06", Day: "15", Album: "Somewhere, USA" },
+      result: "2004.06.15 Somewhere, USA",
+    },
+  }
+
+  for x := range tests {
+    r := tests[x].i.toAlbum()
+    if r != tests[x].result {
+      t.Errorf("Expected %v, got %v", tests[x].result, r)
+    }
+  }
+}
+
+func TestToFile(t *testing.T) {
+  tests := []struct {
+    i *info
+    result string
+  }{
+    { i: &info{ Disc: "", Track: "6", Title: "After Midnight" },
+      result: "6 After Midnight",
+    },{
+      i: &info{ Disc: "2", Track: "03", Title: "Russian Lullaby" },
+      result: "2-03 Russian Lullaby",
+    },
+  }
+
+  for x := range tests {
+    r := tests[x].i.toFile()
+    if r != tests[x].result {
+      t.Errorf("Expected %v, got %v", tests[x].result, r)
+    }
+  }
+}
+
 func TestMatchProbeTags(t *testing.T) {
   tests := []struct {
     info, comb *info
@@ -60,6 +99,7 @@ func TestInfoFromFile(t *testing.T) {
   }
 }
 
+// also tests: fromAlbum
 func TestInfoFromPath(t *testing.T) {
   tests := [][][]string{
     {
@@ -101,7 +141,7 @@ func TestValidDate(t *testing.T) {
 
 func TestMatchYearOnly(t *testing.T) {
   tests := [][]string{
-    { "Test 2000 More", "", "Test 2000 More" },
+    { "No Year Here", "", "No Year Here" },
     { "2000 Album Name", "2000", "Album Name" },
     { "2001 - Venue, City", "2001", "Venue, City" },
   }
