@@ -7,7 +7,7 @@ import (
 
 const (
   version = "0.0.0"
-  description = "Clean up audio collection setting id3 tags & embedding artwork"
+  description = "Clean up audio collection setting metadata & embedding artwork"
 )
 
 const args = `
@@ -37,7 +37,7 @@ func init() {
   flag.StringVar(&flags.Bitrate, "bitrate", "V0", "convert to mp3 (V0=variable 256kbps, 320=constant 320kbps)")
   flag.BoolVar(&flags.Collection, "collection", false, "treat as collection of artists")
   flag.BoolVar(&flags.Force, "force", false, "processes all files, even if path info matches tag info")
-  flag.BoolVar(&flags.Fast, "fast", false, "skips album directory if starts w/ {year}")
+  flag.BoolVar(&flags.Fast, "fast", false, "skips album directory if starts w/ year")
   flag.StringVar(&flags.ModTime, "modtime", "", "set modified timestamp of updated files")
   flag.BoolVar(&flags.Version, "version", false, "print program version, then exit")
   flag.BoolVar(&flags.Write, "write", false, "write changes to disk")

@@ -13,10 +13,16 @@ Positional Args:
 Options:
   -artist string
       treat as specific artist
+  -bitrate string
+      convert to mp3 (V0=variable 256kbps, 320=constant 320kbps) (default "V0")
   -collection
       treat as collection of artists
+  -fast
+      skips album directory if starts w/ year
   -force
-      probes all files, even if path looks good
+      processes all files, even if path info matches tag info
+  -modtime string
+      set modified timestamp of updated files
   -version
       print program version, then exit
   -write
@@ -69,6 +75,13 @@ If `metaflac` not found, FLAC embedding will be skipped, but the program will co
 Child directories of specified PATH, as well as files within PATH itself, are considered to be albums
 or live performances belonging to the specified artist.
 
+### Bitrate (-bitrate V0 OR -bitrate 320)
+
+Convert other audio formats to MP3 using `libmp3lame` encoding and either V0 (variable 256kbps) or 320
+(constant 320kbps) bitrate.
+
+To skip converting FLAC audio, include ` - FLAC` at the end of the album folder name.
+
 ### Collection (-collection)
 
 Immediate child directories of specified PATH are considered to be artists. Child directories of each
@@ -78,19 +91,13 @@ In the event that the artist tag is not found, the artist folder name is used.
 
 To skip processing a child directory, include ` - ` in its name. Such as: `Grateful Dead - UNORGANIZED`
 
-### Convert (-convert V0 OR -convert 320)
+### Fast (-fast)
 
-Convert other audio formats to MP3 using `libmp3lame` encoding and either V0 (variable 256kbps) or 320
-(constant 320kbps) bitrate.
-
-To skip converting FLAC audio, include ` - FLAC` at the end of the album folder name.
+Skips album folder if starts with year without touching any of the individual audio files.
 
 ### Force (-force)
 
-By default, if the album or live performance folder name looks good (includes a full date or year),
-then the individual audio files are not processed. This greatly improves performance.
-
-Using `-force` processes each audio file regardless of the above folder name check.
+Processes each audio file regardless of whether or not the path info matches tag info.
 
 ### Write (-write)
 
