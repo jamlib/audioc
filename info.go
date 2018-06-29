@@ -14,13 +14,27 @@ import (
 )
 
 type info struct {
-  Album, Year, Month, Day string
+  Artist, Album, Year, Month, Day string
   Disc, Track, Title string
+}
+
+func (i *info) toAlbum() string {
+  return fmt.Sprintf("%s.%s.%s %s", i.Year, i.Month, i.Day, i.Album)
+}
+
+func (i *info) toFile() string {
+  var out string
+  if len(i.Disc) > 0 {
+    out += i.Disc + "-"
+  }
+
+  return out + i.Track + " " + safeFilename(i.Title)
 }
 
 // compare info against ffprobe.Tags and combine into best info
 func (i *info) matchProbeTags(p *ffprobe.Tags) (*info, bool) {
   tagInfo := &info{
+    Artist: p.Artist,
     Disc: p.Disc,
     Track: p.Track,
     Title: matchAlbumOrTitle(p.Title),
@@ -80,9 +94,6 @@ func (i *info) fromFile(s string) *info {
 func (i *info) fromPath(p, sep string) *info {
   // start inner-most folder, work out
   for _, s := range reverse(strings.Split(p, sep)) {
-    if len(s) == 0 {
-      continue
-    }
     i.fromAlbum(s)
   }
   return i
@@ -253,7 +264,7 @@ func matchAlbumOrTitle(s string) string {
   s = fixWhitespace(s)
 
   // remove file extension from end
-  s = regexp.MustCompile(`\s-*\s(?i)(flac|m4a|mp3|mp4|shn|wav)$`).ReplaceAllString(s, "")
+  s = regexp.MustCompile(`\s*-*\s*(?i)(flac|m4a|mp3|mp4|shn|wav)$`).ReplaceAllString(s, "")
 
   // remove bitrate/sbd from end
   s = regexp.MustCompile(`\s*-*\s*(?i)(128|192|256|320|sbd)$`).ReplaceAllString(s, "")
