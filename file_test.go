@@ -29,22 +29,22 @@ func tmpFile(t *testing.T, input string, f func(in *os.File)) {
   f(in)
 }
 
-func createTestFiles(paths, contents []string, t *testing.T) string {
+type testFile struct {
+  name, contents string
+}
+
+func createTestFiles(files []*testFile, t *testing.T) string {
   td, err := ioutil.TempDir("", "")
   if err != nil {
     t.Fatal(err)
   }
 
-  for i := range paths {
-    if len(paths[i]) == 0 {
+  for i := range files {
+    if len(files[i].name) == 0 {
       continue
     }
 
-    pa := strings.Split(paths[i], "/")
-    if len(pa) == 0 {
-      continue
-    }
-
+    pa := strings.Split(files[i].name, "/")
     p := filepath.Join(td, filepath.Join(pa[:len(pa)-1]...))
 
     // create parent dirs
@@ -58,7 +58,7 @@ func createTestFiles(paths, contents []string, t *testing.T) string {
     // create file
     if len(pa[len(pa)-1]) > 0 {
       fullpath := filepath.Join(p, pa[len(pa)-1])
-      err := ioutil.WriteFile(fullpath, []byte(contents[i]), 0644)
+      err := ioutil.WriteFile(fullpath, []byte(files[i].contents), 0644)
       if err != nil {
         t.Fatal(err)
       }
@@ -118,13 +118,12 @@ func TestCheckDir(t *testing.T) {
 }
 
 func TestFilesByExtensionImages(t *testing.T) {
-  testFiles := []string{
-    "file1",
-    "file2.jpeg",
-    "dir1/file3.JPG",
-    "dir1/dir2/file4.png",
+  files := []*testFile{
+    {"file1", ""},
+    {"file2.jpeg", ""},
+    {"dir1/file3.JPG", ""},
+    {"dir1/dir2/file4.png", ""},
   }
-  var contents = make([]string, len(testFiles))
 
   result := []string{
     "dir1/dir2/file4.png",
@@ -132,7 +131,7 @@ func TestFilesByExtensionImages(t *testing.T) {
     "file2.jpeg",
   }
 
-  dir := createTestFiles(testFiles, contents, t)
+  dir := createTestFiles(files, t)
   defer os.RemoveAll(dir)
 
   paths := filesByExtension(dir, imageExts)
@@ -142,16 +141,15 @@ func TestFilesByExtensionImages(t *testing.T) {
 }
 
 func TestFilesByExtensionAudio(t *testing.T) {
-  testFiles := []string{
-    "not audio file",
-    "file1.FLAC",
-    "file2.m4a",
-    "dir1/file3.mp3",
-    "dir1/dir2/file4.mp4",
-    "dir1/dir2/file5.SHN",
-    "dir1/dir2/file6.WAV",
+  files := []*testFile{
+    {"not audio file", ""},
+    {"file1.FLAC", ""},
+    {"file2.m4a", ""},
+    {"dir1/file3.mp3", ""},
+    {"dir1/dir2/file4.mp4", ""},
+    {"dir1/dir2/file5.SHN", ""},
+    {"dir1/dir2/file6.WAV", ""},
   }
-  var contents = make([]string, len(testFiles))
 
   result := []string{
     "dir1/dir2/file4.mp4",
@@ -162,7 +160,7 @@ func TestFilesByExtensionAudio(t *testing.T) {
     "file2.m4a",
   }
 
-  dir := createTestFiles(testFiles, contents, t)
+  dir := createTestFiles(files, t)
   defer os.RemoveAll(dir)
 
   paths := filesByExtension(dir, audioExts)
@@ -230,19 +228,19 @@ func TestSafeFilename(t *testing.T) {
 }
 
 func testFilesFullPath(t *testing.T, f func(dir string, files []string)) {
-  testFiles := []string{
-    "file1", "file2.jpeg", "dir1/file3.JPG", "dir1/dir2/file4.png",
-  }
-  contents := []string{
-    "abcde", "a", "acddfefsefd", "dfadfd",
+  newFiles := []*testFile{
+    {"file1", "abcde"},
+    {"file2.jpeg", "a"},
+    {"dir1/file3.JPG", "acddfefsefd"},
+    {"dir1/dir2/file4.png", "dfadfd"},
   }
 
-  dir := createTestFiles(testFiles, contents, t)
+  dir := createTestFiles(newFiles, t)
   defer os.RemoveAll(dir)
 
   files := []string{}
-  for i := range testFiles {
-    files = append(files, filepath.Join(dir, testFiles[i]))
+  for i := range newFiles {
+    files = append(files, filepath.Join(dir, newFiles[i].name))
   }
 
   f(dir, files)
@@ -333,14 +331,14 @@ func TestCopyFile(t *testing.T) {
 }
 
 func TestRenameFolder(t *testing.T) {
-  testFiles := []string{
-    "dir1/file1", "dir2/file2", "dir3/file3", "dir4/file4",
-  }
-  contents := []string{
-    "abcde", "a", "", "",
+  testFiles := []*testFile{
+    {"dir1/file1", "abcde"},
+    {"dir2/file2", "a"},
+    {"dir3/file3", ""},
+    {"dir4/file4", ""},
   }
 
-  dir := createTestFiles(testFiles, contents, t)
+  dir := createTestFiles(testFiles, t)
   defer os.RemoveAll(dir)
 
   tests := [][]string{
