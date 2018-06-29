@@ -9,65 +9,6 @@ import (
   "path/filepath"
 )
 
-type mockFfmpeg struct {
-  Embedded string
-}
-
-func (m *mockFfmpeg) OptimizeAlbumArt(s, d string) (string, error) {
-  // temp file for optimizing
-  tmp, err := ioutil.TempFile("", "")
-  if err != nil {
-    return "", err
-  }
-  defer os.Remove(tmp.Name())
-  defer tmp.Close()
-
-  b, err := ioutil.ReadFile(s)
-  if err != nil {
-    return "", err
-  }
-
-  // can make smaller
-  contents := string(b)
-  if len(contents) > 0 {
-    _, err = io.WriteString(tmp, contents[:len(contents)-1])
-    if err != nil {
-      return "", err
-    }
-    // use instead of original source
-    s = tmp.Name()
-  }
-
-  err = copyFile(s, d)
-  if err != nil {
-    return "", err
-  }
-  return "", nil
-}
-
-func (m *mockFfmpeg) Exec(args ...string) (string, error) {
-  // hook on extract audio
-  if len(args) == 4 {
-    err := ioutil.WriteFile(args[3], []byte(m.Embedded), 0644)
-    if err != nil {
-      return "", err
-    }
-  }
-  return "", nil
-}
-
-type mockFfprobe struct {
-  Width int
-  Embedded string
-}
-
-func (m *mockFfprobe) EmbeddedImage() (int, int, bool) {
-  if len(m.Embedded) > 0 {
-    return m.Width, 0, true
-  }
-  return 0, 0, false
-}
-
 func testArtwork(t *testing.T, testFunc func(td, f, fo string)) {
   td, err := ioutil.TempDir("", "")
   if err != nil {
@@ -81,20 +22,18 @@ func testArtwork(t *testing.T, testFunc func(td, f, fo string)) {
 func testArtworkFiles(t *testing.T,
   testFiles map[string]string, testFunc func(dir string)) {
 
-  files := []string{}
-  contents := []string{}
+  files := []*testFile{}
   for k, v := range testFiles {
-    files = append(files, k)
-    contents = append(contents, v)
+    files = append(files, &testFile{k, v})
   }
 
-  dir := createTestFiles(files, contents, t)
+  dir := createTestFiles(files, t)
   defer os.RemoveAll(dir)
 
   testFunc(dir)
 }
 
-func TestProcess(t *testing.T) {
+func TestArtworkProcess(t *testing.T) {
   testArtwork(t, func(td, f, fo string) {
     tests := []struct {
       width int
@@ -140,7 +79,7 @@ func TestProcess(t *testing.T) {
   })
 }
 
-func TestEmbedded(t *testing.T) {
+func TestArtworkEmbedded(t *testing.T) {
   testArtwork(t, func(td, f, fo string) {
     tests := []struct {
       width int
@@ -179,7 +118,7 @@ func TestEmbedded(t *testing.T) {
   })
 }
 
-func TestFromPath(t *testing.T) {
+func TestArtworkFromPath(t *testing.T) {
   testArtwork(t, func(td, f, fo string) {
     tests := []struct {
       width int
@@ -225,7 +164,7 @@ func TestFromPath(t *testing.T) {
 }
 
 // also covers: copyAsFolderOrigJpg
-func TestCopyAsFolderJpg(t *testing.T) {
+func TestArtworkCopyAsFolderJpg(t *testing.T) {
   testArtwork(t, func(td, f, fo string) {
     testFiles := map[string]string{
       "file1.jpg": "abcde",
