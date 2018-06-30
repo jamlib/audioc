@@ -117,6 +117,14 @@ func TestCheckDir(t *testing.T) {
   }
 }
 
+func TestOnlyDir(t *testing.T) {
+  path := filepath.Join("one", "two", "three.jpg")
+  r := onlyDir(path)
+  if r != "one/two" {
+    t.Errorf("Expected %v, got %v", "one/two", r)
+  }
+}
+
 func TestFilesByExtensionImages(t *testing.T) {
   files := []*testFile{
     {"file1", ""},
