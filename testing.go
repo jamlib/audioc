@@ -7,6 +7,7 @@ import (
   "encoding/json"
 
   "github.com/JamTools/goff/ffmpeg"
+  "github.com/JamTools/goff/ffprobe"
 )
 
 type mockFfmpeg struct {
@@ -85,4 +86,20 @@ func (m *mockFfprobe) EmbeddedImage() (int, int, bool) {
     return m.Width, 0, true
   }
   return 0, 0, false
+}
+
+func (m *mockFfprobe) GetData(filePath string) (*ffprobe.Data, error) {
+  d := &ffprobe.Data{ Format: &ffprobe.Format{ Tags: &ffprobe.Tags{} } }
+
+  raw, err := ioutil.ReadFile(filePath)
+  if err != nil {
+    return d, err
+  }
+
+  err = json.Unmarshal(raw, d.Format.Tags)
+  if err != nil {
+    return d, err
+  }
+
+  return d, nil
 }
