@@ -48,6 +48,13 @@ func checkDir(dir string) (string, error) {
   return dir, nil
 }
 
+// separate dir from fullpath
+func onlyDir(path string) string {
+  path, _ = filepath.Split(path)
+  path = strings.TrimSuffix(path, string(os.PathSeparator))
+  return path
+}
+
 func filesByExtension(dir string, exts []string) []string {
   files := []string{}
 
