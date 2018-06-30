@@ -53,7 +53,7 @@ func main() {
 
   // process files using multiple cores
   var workers = runtime.NumCPU()
-  //workers = 1 // TEMPORARY: develop in single-threaded mode
+  //workers = 1 // DEBUG in single-threaded mode
 
   a := &audiocc{ Ffmpeg: ffm, Ffprobe: ffp, DirEntry: args[0],
     Workers: workers, Workdir: "audiocc" }
@@ -68,7 +68,22 @@ func main() {
 func skipArtistOnCollection(p string) bool {
   if flags.Collection {
     pa := strings.Split(p, string(os.PathSeparator))
+    // first folder is artist
     if strings.Index(pa[0], " - ") != -1 {
+      return true
+    }
+  }
+  return false
+}
+
+// skip if album folder name contains year (--fast)
+func skipFast(p string) bool {
+  if flags.Fast {
+    pa := strings.Split(p, string(os.PathSeparator))
+    // last folder is album
+    t := &info{}
+    t.fromAlbum(pa[len(pa)-1])
+    if len(t.Year) > 0 && len(t.Album) > 0 {
       return true
     }
   }
@@ -117,20 +132,10 @@ func (a *audiocc) process() error {
 
   // group files by parent directory
   err = bundleFiles(a.DirEntry, a.Files, func(indexes []int) error {
+
     pi := getPathInfo(a.DirEntry, a.Files[indexes[0]])
-
-    // skip if folder name contains ' - '
-    if skipArtistOnCollection(pi.Dir) {
+    if skipArtistOnCollection(pi.Dir) || skipFast(pi.Dir) {
       return nil
-    }
-
-    // skip if album folder name contains year (--fast)
-    if flags.Fast {
-      t := &info{}
-      t.fromAlbum(pi.Dir)
-      if len(t.Year) > 0 && len(t.Album) > 0 {
-        return nil
-      }
     }
 
     // process artwork once per folder
@@ -149,10 +154,13 @@ func (a *audiocc) process() error {
     }
 
     // TODO: threaded error handling
-    dir := a.processThreaded(indexes)
+    path := a.processThreaded(indexes)
+    dir := onlyDir(path)
 
     // remove workDir
-    os.RemoveAll(workDir)
+    if pi.Fulldir != workDir {
+      os.RemoveAll(workDir)
+    }
 
     // if not same dir, rename directory to target dir
     if pi.Fulldir != dir {
@@ -221,14 +229,14 @@ func (a *audiocc) processIndex(index int) (string, error) {
   // info from embedded tags within audio file
   d, err := a.Ffprobe.GetData(pi.Fullpath)
   if err != nil {
-    return "", err
+    return pi.Fullpath, err
   }
 
   i, match := mainInfo.matchProbeTags(d.Format.Tags)
 
   // skip if sources match (unless --force)
   if match && !flags.Force {
-    return "", nil
+    return pi.Fullpath, nil
   }
 
   // override artist for consistency
@@ -240,42 +248,46 @@ func (a *audiocc) processIndex(index int) (string, error) {
     i.Artist = strings.Split(pi.Dir, string(os.PathSeparator))[0]
   }
 
-  // build resulting directory
-  var dir string
+  // build resulting path
+  var path string
   if flags.Collection {
     // build from DirEntry; include artist then year
-    dir = filepath.Join(a.DirEntry, i.Artist, i.Year)
+    path = filepath.Join(a.DirEntry, i.Artist, i.Year)
   } else {
     // remove current dir from fullpath
-    dir = strings.TrimSuffix(pi.Fulldir, pi.Dir)
+    path = strings.TrimSuffix(pi.Fulldir, pi.Dir)
   }
 
   // append directory generated from info
-  dir = filepath.Join(dir, i.toAlbum())
+  path = filepath.Join(path, i.toAlbum())
 
   // print changes to be made
   fmt.Printf("%v\n", pi.Fullpath)
+
   if !flags.Write {
-    // return if not writing
-    return dir, nil
+    return pi.Fullpath, nil
   }
 
   // convert audio (if necessary) & update tags
   if pi.Ext != ".flac" || regexp.MustCompile(` - FLAC$`).FindString(pi.Dir) == "" {
     // convert to mp3 except flac files with " - FLAC" in folder name
-    err := a.processMp3(pi, i)
+    f, err := a.processMp3(pi, i)
     if err != nil {
-      return dir, err
+      return pi.Fullpath, err
     }
+
+    // add filename to returning path
+    _, file := filepath.Split(f)
+    path = filepath.Join(path, file)
   } else {
     // TODO: use metaflac to edit flac metadata & embedd artwork
     fmt.Printf("\n*** Flac processing with 'metaflac' not yet implemented.\n")
   }
 
-  return dir, nil
+  return path, nil
 }
 
-func (a *audiocc) processMp3(pi *pathInfo, i *info) error {
+func (a *audiocc) processMp3(pi *pathInfo, i *info) (string, error) {
   // if already mp3, copy stream; do not convert
   quality := flags.Bitrate
   if pi.Ext == ".mp3" {
@@ -289,18 +301,21 @@ func (a *audiocc) processMp3(pi *pathInfo, i *info) error {
     Disc: i.Disc, Track: i.Track, Title: i.Title, Artwork: a.Image }
 
   // save new file to subdir within current path
-  newFile := filepath.Join(pi.Fulldir, a.Workdir, i.toFile() + ".mp3")
+  name := i.toFile() + ".mp3"
+  file := filepath.Join(pi.Fulldir, name)
+  newFile := filepath.Join(pi.Fulldir, a.Workdir, name)
 
   // process or convert to mp3
   _, err := a.Ffmpeg.ToMp3(pi.Fullpath, quality, ffmeta, newFile)
   if err != nil {
-    return err
+    fmt.Printf("File: %v, Error: %v\n\n", pi.Fullpath, err)
+    return newFile, err
   }
 
   // ensure output file was written
   fi, err := os.Stat(newFile)
   if err != nil {
-    return err
+    return newFile, err
   }
 
   // if resulting file has size
@@ -309,15 +324,15 @@ func (a *audiocc) processMp3(pi *pathInfo, i *info) error {
     // delete original
     err = os.Remove(pi.Fullpath)
     if err != nil {
-      return err
+      return newFile, err
     }
 
     // move new to original directory
-    err = os.Rename(newFile, filepath.Join(pi.Fulldir, i.toFile() + ".mp3"))
+    err = os.Rename(newFile, file)
     if err != nil {
-      return err
+      return newFile, err
     }
   }
 
-  return nil
+  return file, nil
 }
