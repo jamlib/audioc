@@ -57,23 +57,18 @@ func (m *mockFfmpeg) Exec(args ...string) (string, error) {
   return "", nil
 }
 
-func (m *mockFfmpeg) ToMp3(i, q string, meta ffmpeg.Metadata, o string) (string, error) {
-  a := struct {
-    Input, Quality, Output string
-    Meta *ffmpeg.Metadata
-  }{ i, q, o, &meta }
-
-  b, err := json.Marshal(a)
+func (m *mockFfmpeg) ToMp3(c *ffmpeg.Mp3Config) (string, error) {
+  b, err := json.Marshal(c)
   if err != nil {
     return "", err
   }
 
-  err = ioutil.WriteFile(o, b, 0644)
+  err = ioutil.WriteFile(c.Output, b, 0644)
   if err != nil {
     return "", err
   }
 
-  return o, nil
+  return c.Output, nil
 }
 
 type mockFfprobe struct {
