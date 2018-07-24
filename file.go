@@ -217,6 +217,12 @@ func renameFolder(src, dest string) (string, error) {
     }
   }
 
+  // trim off last path element and create full path
+  err = os.MkdirAll(filepath.Dir(dest), 0777)
+  if err != nil {
+    return dest, err
+  }
+
   err = os.Rename(src, dest)
   return dest, err
 }
