@@ -344,6 +344,7 @@ func TestRenameFolder(t *testing.T) {
     {"dir2/file2", "a"},
     {"dir3/file3", ""},
     {"dir4/file4", ""},
+    {"dir6/file6", ""},
   }
 
   dir := createTestFiles(testFiles, t)
@@ -353,6 +354,7 @@ func TestRenameFolder(t *testing.T) {
     {"dir2", "dir1", "dir1 (1)"},
     {"dir3", "dir1", "dir1 (2)"},
     {"dir4", "dir5", "dir5"},
+    {"dir6", "path2/dir5", "path2/dir5"},
   }
 
   for i := 0; i < len(tests); i++ {
