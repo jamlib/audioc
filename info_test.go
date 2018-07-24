@@ -251,6 +251,7 @@ func TestMatchAlbumOrTitle(t *testing.T) {
     { ", SBD Album SBD", "SBD Album" },
     { "!^?Bitrate Album!? -320", "Bitrate Album!?" },
     { "intro/crowd", "intro-crowd" },
+    { " Whereever [SBD 320-MP3]", "Whereever" },
   }
 
   for i := range tests {
