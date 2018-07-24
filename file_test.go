@@ -4,6 +4,7 @@ import (
   "io"
   "os"
   "errors"
+  "reflect"
   "strings"
   "strconv"
   "testing"
@@ -69,21 +70,28 @@ func createTestFiles(files []*testFile, t *testing.T) string {
 }
 
 func TestPathInfo(t *testing.T) {
-  tests := [][][]string{
-    {
-      { "dir1", "dir2/dir3/file1.ext" },
-      { "dir1/dir2/dir3/file1.ext", "dir1/dir2/dir3", "dir2/dir3", "file1", ".ext" },
-    }, {
-      { "dir3/dir4", "file2.ext" },
-      { "dir3/dir4/file2.ext", "dir3/dir4", "dir4", "file2", ".ext" },
+  tests := []struct {
+    base, path string
+    pi *pathInfo
+  }{
+    { base: "dir1", path: "dir2/dir3/file1.ext",
+      pi: &pathInfo{ Fullpath: "dir1/dir2/dir3/file1.ext",
+        Fulldir: "dir1/dir2/dir3", Dir: "dir2/dir3", File: "file1", Ext: ".ext" },
+    },{
+      base: "dir3/dir4", path: "file2.ext",
+      pi: &pathInfo{ Fullpath: "dir3/dir4/file2.ext",
+        Fulldir: "dir3/dir4", Dir: "dir4", File: "file2", Ext: ".ext" },
+    },{
+      base: "/dir3/dir4/", path: "file2.ext",
+      pi: &pathInfo{ Fullpath: "/dir3/dir4/file2.ext",
+        Fulldir: "/dir3/dir4", Dir: "dir4", File: "file2", Ext: ".ext" },
     },
   }
 
   for x := range tests {
-    pi := getPathInfo(tests[x][0][0], tests[x][0][1])
-    compare := []string{ pi.Fullpath, pi.Fulldir, pi.Dir, pi.File, pi.Ext }
-    if strings.Join(compare, "\n") != strings.Join(tests[x][1], "\n") {
-      t.Errorf("Expected %v, got %v", tests[x][1], compare)
+    pi := getPathInfo(tests[x].base, tests[x].path)
+    if !reflect.DeepEqual(pi, tests[x].pi) {
+      t.Errorf("Expected %v, got %v", tests[x].pi, pi)
     }
   }
 }
