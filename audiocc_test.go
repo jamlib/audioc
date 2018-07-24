@@ -51,6 +51,23 @@ func TestSkipFast(t *testing.T) {
   }
 }
 
+func TestValidWorkdir(t *testing.T) {
+  tests := []struct {
+    a *audiocc
+    v bool
+  }{
+    { a: &audiocc{ Workdir: "" }, v: false },
+    { a: &audiocc{ Workdir: "test" }, v: true },
+  }
+
+  for i := range tests {
+    r := tests[i].a.validWorkdir() == nil
+    if r != tests[i].v {
+      t.Errorf("Expected %v, got %v", tests[i].v, r)
+    }
+  }
+}
+
 func TestProcessDirDNE(t *testing.T) {
   a := &audiocc{ DirEntry: "audiocc-dir-def-dne" }
   err := a.process()
