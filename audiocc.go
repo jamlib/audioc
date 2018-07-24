@@ -25,7 +25,7 @@ type audiocc struct {
 }
 
 type ffmpeger interface {
-  ToMp3(i, q string, m ffmpeg.Metadata, o string) (string, error)
+  ToMp3(c *ffmpeg.Mp3Config) (string, error)
   OptimizeAlbumArt(s, d string) (string, error)
   Exec(args ...string) (string, error)
 }
@@ -55,7 +55,7 @@ func main() {
   var workers = runtime.NumCPU()
   //workers = 1 // DEBUG in single-threaded mode
 
-  a := &audiocc{ Ffmpeg: ffm, Ffprobe: ffp, DirEntry: args[0],
+  a := &audiocc{ Ffmpeg: ffm, Ffprobe: ffp, DirEntry: filepath.Clean(args[0]),
     Workers: workers, Workdir: "audiocc" }
 
   err = a.process()
@@ -88,6 +88,15 @@ func skipFast(p string) bool {
     }
   }
   return false
+}
+
+// ensure workdir is not blank & matches only A-Za-z0-9-\s
+func (a *audiocc) validWorkdir() error {
+  m := regexp.MustCompile(`^[A-Za-z0-9-\s]*$`).FindString(a.Workdir)
+  if len(a.Workdir) > 0 && m == a.Workdir {
+    return nil
+  }
+  return fmt.Errorf("workdir must contain only: A-Za-z0-9-\\s")
 }
 
 // process album art once per folder of files
@@ -125,6 +134,12 @@ func (a *audiocc) process() error {
     return err
   }
 
+  // ensure workdir valid
+  err = a.validWorkdir()
+  if err != nil {
+    return err
+  }
+
   fmt.Printf("\nProcessing: %v ...\n", a.DirEntry)
 
   // obtain audio file list
@@ -158,9 +173,7 @@ func (a *audiocc) process() error {
     dir := onlyDir(path)
 
     // remove workDir
-    if pi.Fulldir != workDir {
-      os.RemoveAll(workDir)
-    }
+    os.RemoveAll(workDir)
 
     // if not same dir, rename directory to target dir
     if pi.Fulldir != dir {
@@ -262,10 +275,9 @@ func (a *audiocc) processIndex(index int) (string, error) {
   path = filepath.Join(path, i.toAlbum())
 
   // print changes to be made
-  fmt.Printf("%v\n", pi.Fullpath)
-
-  if !flags.Write {
-    return pi.Fullpath, nil
+  p := fmt.Sprintf("%v\n", pi.Fullpath)
+  if !match {
+    p += fmt.Sprintf("  * update tags: %#v\n", i)
   }
 
   // convert audio (if necessary) & update tags
@@ -279,10 +291,17 @@ func (a *audiocc) processIndex(index int) (string, error) {
     // add filename to returning path
     _, file := filepath.Split(f)
     path = filepath.Join(path, file)
+
+    if pi.Fullpath != path {
+      p += fmt.Sprintf("  * rename to: %v\n", path)
+    }
   } else {
     // TODO: use metaflac to edit flac metadata & embedd artwork
-    fmt.Printf("\n*** Flac processing with 'metaflac' not yet implemented.\n")
+    p += fmt.Sprintf("\n*** Flac processing with 'metaflac' not yet implemented.\n")
   }
+
+  // print to console all at once
+  fmt.Printf(p)
 
   return path, nil
 }
@@ -300,13 +319,12 @@ func (a *audiocc) processMp3(pi *pathInfo, i *info) (string, error) {
   ffmeta := ffmpeg.Metadata{ Artist: i.Artist, Album: i.toAlbum(),
     Disc: i.Disc, Track: i.Track, Title: i.Title, Artwork: a.Image }
 
-  // save new file to subdir within current path
-  name := i.toFile() + ".mp3"
-  file := filepath.Join(pi.Fulldir, name)
-  newFile := filepath.Join(pi.Fulldir, a.Workdir, name)
+  // save new file to Workdir subdir within current path
+  newFile := filepath.Join(pi.Fulldir, a.Workdir, i.toFile() + ".mp3")
 
   // process or convert to mp3
-  _, err := a.Ffmpeg.ToMp3(pi.Fullpath, quality, ffmeta, newFile)
+  c := &ffmpeg.Mp3Config{ pi.Fullpath, quality, newFile, ffmeta, flags.Fix }
+  _, err := a.Ffmpeg.ToMp3(c)
   if err != nil {
     fmt.Printf("File: %v, Error: %v\n\n", pi.Fullpath, err)
     return newFile, err
@@ -318,21 +336,27 @@ func (a *audiocc) processMp3(pi *pathInfo, i *info) (string, error) {
     return newFile, err
   }
 
-  // if resulting file has size
+  // if flagsWrite & resulting file has size
   // TODO: ensure resulting file is good by reading & comparing metadata
   if fi.Size() > 0 {
-    // delete original
-    err = os.Remove(pi.Fullpath)
-    if err != nil {
-      return newFile, err
+    file := filepath.Join(pi.Fulldir, i.toFile() + ".mp3")
+
+    if flags.Write {
+      // delete original
+      err = os.Remove(pi.Fullpath)
+      if err != nil {
+        return file, err
+      }
+
+      // move new to original directory
+      err = os.Rename(newFile, file)
+      if err != nil {
+        return file, err
+      }
     }
 
-    // move new to original directory
-    err = os.Rename(newFile, file)
-    if err != nil {
-      return newFile, err
-    }
+    return file, nil
   }
 
-  return file, nil
+  return newFile, nil
 }
