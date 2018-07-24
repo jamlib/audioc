@@ -26,7 +26,7 @@ Options:
 
 type Flags struct {
   Artist, Bitrate, ModTime string
-  Collection, Fast, Force, Version, Write bool
+  Collection, Fast, Fix, Force, Version, Write bool
 }
 
 var flags = Flags{}
@@ -36,8 +36,9 @@ func init() {
   flag.StringVar(&flags.Artist, "artist", "", "treat as specific artist")
   flag.StringVar(&flags.Bitrate, "bitrate", "V0", "convert to mp3 (V0=variable 256kbps, 320=constant 320kbps)")
   flag.BoolVar(&flags.Collection, "collection", false, "treat as collection of artists")
-  flag.BoolVar(&flags.Force, "force", false, "processes all files, even if path info matches tag info")
   flag.BoolVar(&flags.Fast, "fast", false, "skips album directory if starts w/ year")
+  flag.BoolVar(&flags.Fix, "fix", false, "fixes incorrect track length, ie 1035:36:51")
+  flag.BoolVar(&flags.Force, "force", false, "processes all files, even if path info matches tag info")
   flag.StringVar(&flags.ModTime, "modtime", "", "set modified timestamp of updated files")
   flag.BoolVar(&flags.Version, "version", false, "print program version, then exit")
   flag.BoolVar(&flags.Write, "write", false, "write changes to disk")

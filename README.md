@@ -19,6 +19,8 @@ Options:
       treat as collection of artists
   -fast
       skips album directory if starts w/ year
+  -fix
+      fixes incorrect track length, ie 1035:36:51
   -force
       processes all files, even if path info matches tag info
   -modtime string
@@ -94,6 +96,11 @@ To skip processing a child directory, include ` - ` in its name. Such as: `Grate
 ### Fast (-fast)
 
 Skips album folder if starts with year without touching any of the individual audio files.
+
+### Fix (-fix)
+
+Fixes incorrect track length (ie, 1035:36:51) by first removing all metadata, then adding metadata
+back separately.
 
 ### Force (-force)
 
