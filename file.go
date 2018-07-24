@@ -19,16 +19,17 @@ type pathInfo struct {
 }
 
 func getPathInfo(base, path string) *pathInfo {
+  base = filepath.Clean(base)
   pi := &pathInfo{Fullpath: filepath.Join(base, path) }
 
   pi.Fulldir, pi.File = filepath.Split(pi.Fullpath)
   pi.Fulldir = filepath.Clean(pi.Fulldir)
 
   pi.Dir = strings.TrimPrefix(pi.Fulldir, base)
+  pi.Dir = strings.TrimPrefix(pi.Dir, string(os.PathSeparator))
   if pi.Dir == "" {
     pi.Dir = filepath.Base(pi.Fulldir)
   }
-  pi.Dir = strings.TrimPrefix(pi.Dir, string(os.PathSeparator))
 
   pi.Ext = strings.ToLower(filepath.Ext(pi.File))
   pi.File = strings.TrimSuffix(pi.File, pi.Ext)
