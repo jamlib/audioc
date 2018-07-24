@@ -255,8 +255,10 @@ func matchAlbumOrTitle(s string) string {
   // replace / or \ with -
   s = regexp.MustCompile(`[\/\\]+`).ReplaceAllString(s, "-")
 
+  // remove [*] from end where * is wildcard
+  s = regexp.MustCompile(`\s*\[[^\[\]]*\]\s*$`).ReplaceAllString(s, "")
+
   // only these chars allowed: A-Za-z0-9-',.!?&> _()
-  // remove all others
   s = regexp.MustCompile(`[^A-Za-z0-9-',.!?&> _()]+`).ReplaceAllString(s, "")
 
   // remove () (1)
