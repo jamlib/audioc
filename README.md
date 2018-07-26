@@ -113,6 +113,54 @@ all changes to the console for review, but not make them.
 
 Once satisfied, run again including `-write` to actually make changes.
 
+## Developing
+
+[Install Go and Dep](INSTALL_GO_DEP.md).
+
+### Building
+
+Get latest source, run:
+
+    go get github.com/JamTools/audiocc
+
+Navigate to source path, run:
+
+    cd $GOPATH/src/github.com/JamTools/audiocc
+
+Ensure dependencies are installed and up-to-date with `dep`, run:
+
+    dep ensure
+
+From within source path, run:
+
+    go build
+
+The binary will build to the current directory. To test by displaying usage, run:
+
+    ./audiocc --help
+
+### Testing
+
+From within source path, run:
+
+    go test -cover -v ./...
+
+### Submitting a Pull Request
+
+Fork repo on Github.
+
+From within source path, setup new remote, run:
+
+    git remote add myfork git@github.com:$GITHUB-USERNAME/audiocc.git
+
+Create a new branch to use for development, run:
+
+    git checkout -b new-branch
+
+Make your changes, add, commit and push to your Github fork.
+
+Back on Github, submit pull request.
+
 ## License
 
 This code is available open source under the terms of the [MIT License](http://opensource.org/licenses/MIT).
