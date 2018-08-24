@@ -17,22 +17,11 @@ import (
 type audiocc struct {
   DirEntry string
   Image string
-  Ffmpeg ffmpeger
-  Ffprobe ffprober
+  Ffmpeg ffmpeg.Ffmpeger
+  Ffprobe ffprobe.Ffprober
   Files []string
   Workers int
   Workdir string
-}
-
-type ffmpeger interface {
-  ToMp3(c *ffmpeg.Mp3Config) (string, error)
-  OptimizeAlbumArt(s, d string) (string, error)
-  Exec(args ...string) (string, error)
-}
-
-type ffprober interface {
-  GetData(filePath string) (*ffprobe.Data, error)
-  EmbeddedImage() (int, int, bool)
 }
 
 func main() {

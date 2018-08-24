@@ -8,7 +8,7 @@
     "ffmpeg",
     "ffprobe"
   ]
-  revision = "800d0696ac69671eea34f6956e27c5d014a49c60"
+  revision = "4089232b9d28bc4c795aa780e30c150cd903861c"
 
 [solve-meta]
   analyzer-name = "dep"

@@ -7,6 +7,7 @@ import (
   "path/filepath"
   "encoding/json"
 
+  "github.com/JamTools/goff/ffmpeg"
   "github.com/JamTools/goff/ffprobe"
 )
 
@@ -82,7 +83,7 @@ type TestProcessFiles struct {
 }
 
 func createTestProcessFiles(t *testing.T, files []*TestProcessFiles) (*audiocc, []int) {
-  a := &audiocc{ Ffmpeg: &mockFfmpeg{}, Ffprobe: &mockFfprobe{},
+  a := &audiocc{ Ffmpeg: &ffmpeg.MockFfmpeg{}, Ffprobe: &ffprobe.MockFfprobe{},
     Files: []string{}, Workers: 1 }
 
   indexes := []int{}
@@ -201,7 +202,7 @@ func TestProcessMp3(t *testing.T) {
   dir := createTestFiles(testFiles, t)
   defer os.RemoveAll(dir)
 
-  a := &audiocc{ DirEntry: dir, Ffmpeg: &mockFfmpeg{} }
+  a := &audiocc{ DirEntry: dir, Ffmpeg: &ffmpeg.MockFfmpeg{} }
 
   tests := []struct {
     pi *pathInfo

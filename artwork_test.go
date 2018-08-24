@@ -7,6 +7,9 @@ import (
   "testing"
   "io/ioutil"
   "path/filepath"
+
+  "github.com/JamTools/goff/ffmpeg"
+  "github.com/JamTools/goff/ffprobe"
 )
 
 func testArtwork(t *testing.T, testFunc func(td, f, fo string)) {
@@ -57,8 +60,8 @@ func TestArtworkProcess(t *testing.T) {
       }
 
       a := &artwork{ TempDir: td,
-        Ffmpeg: &mockFfmpeg{ Embedded: tests[i].embedded }, ImgDecode: imageDecode,
-        Ffprobe: &mockFfprobe{ Width: tests[i].width, Embedded: tests[i].embedded } }
+        Ffmpeg: &ffmpeg.MockFfmpeg{ Embedded: tests[i].embedded }, ImgDecode: imageDecode,
+        Ffprobe: &ffprobe.MockFfprobe{ Width: tests[i].width, Embedded: tests[i].embedded } }
 
       testArtworkFiles(t, tests[i].files, func(dir string) {
         a.PathInfo = &pathInfo{ Fulldir: dir }
@@ -97,7 +100,7 @@ func TestArtworkEmbedded(t *testing.T) {
     }
 
     for i := range tests {
-      a := &artwork{ Ffmpeg: &mockFfmpeg{ Embedded: tests[i].embedded }, TempDir: td }
+      a := &artwork{ Ffmpeg: &ffmpeg.MockFfmpeg{ Embedded: tests[i].embedded }, TempDir: td }
 
       testArtworkFiles(t, tests[i].files, func(dir string) {
         a.PathInfo = &pathInfo{ Fulldir: dir }
@@ -142,7 +145,7 @@ func TestArtworkFromPath(t *testing.T) {
         return c, "", nil
       }
 
-      a := &artwork{ Ffmpeg: &mockFfmpeg{}, TempDir: td, ImgDecode: imageDecode }
+      a := &artwork{ Ffmpeg: &ffmpeg.MockFfmpeg{}, TempDir: td, ImgDecode: imageDecode }
 
       testArtworkFiles(t, tests[i].files, func(dir string) {
         a.PathInfo = &pathInfo{ Fulldir: dir }
