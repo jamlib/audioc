@@ -19,7 +19,13 @@ type info struct {
 }
 
 func (i *info) toAlbum() string {
-  return fmt.Sprintf("%s.%s.%s %s", i.Year, i.Month, i.Day, i.Album)
+  if i.Year != "" {
+    if i.Month != "" && i.Day != ""{
+      return fmt.Sprintf("%s.%s.%s %s", i.Year, i.Month, i.Day, i.Album)
+    }
+    return fmt.Sprintf("%s %s", i.Year, i.Album)
+  }
+  return i.Album
 }
 
 func (i *info) toFile() string {
@@ -33,6 +39,9 @@ func (i *info) toFile() string {
 
 // compare info against ffprobe.Tags and combine into best info
 func (i *info) matchProbeTags(p *ffprobe.Tags) (*info, bool) {
+  // match Disc "1/2" as "1"
+  p.Disc = regexp.MustCompile(`^\d+`).FindString(p.Disc)
+
   tagInfo := &info{
     Artist: p.Artist,
     Disc: p.Disc,
@@ -91,7 +100,7 @@ func (i *info) fromFile(s string) *info {
   return i
 }
 
-func (i *info) fromPath(p, sep string) *info {
+func (i *info) fromPath(p string) *info {
   // start inner-most folder, work out
   for _, s := range reverse(strings.Split(p, sep)) {
     i.fromAlbum(s)

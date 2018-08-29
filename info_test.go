@@ -14,6 +14,9 @@ func TestToAlbum(t *testing.T) {
   }{
     { i: &info{ Year: "2004", Month: "06", Day: "15", Album: "Somewhere, USA" },
       result: "2004.06.15 Somewhere, USA",
+    },{
+      i: &info{ Year: "2004", Album: "Great Album" },
+      result: "2004 Great Album",
     },
   }
 
@@ -66,6 +69,11 @@ func TestMatchProbeTags(t *testing.T) {
       tags: &ffprobe.Tags{ Album: "1980.02.28 Kean College After Midnight" },
       comb: &info{ Album: "Kean College After Midnight", Year: "1980", Month: "02", Day: "28" },
       match: false,
+    },{
+      info: &info{ Disc: "1" },
+      tags: &ffprobe.Tags{ Disc: "1/2" },
+      comb: &info{ Disc: "1" },
+      match: true,
     },
   }
 
@@ -112,7 +120,7 @@ func TestInfoFromPath(t *testing.T) {
 
   for x := range tests {
     i := &info{}
-    i.fromPath(tests[x][0][0], "/")
+    i.fromPath(tests[x][0][0])
     compare := []string{ i.Year, i.Month, i.Day, i.Album }
     if strings.Join(compare, "\n") != strings.Join(tests[x][1], "\n") {
       t.Errorf("Expected %v, got %v", tests[x][1], compare)
