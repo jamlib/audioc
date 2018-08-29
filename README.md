@@ -10,25 +10,36 @@ Usage: audiocc [OPTIONS] PATH
 Positional Args:
   PATH           directory path
 
+Mode (specify only one):
+  --artist "NAME"
+    treat as specific artist
+
+  --collection
+    treat as collection of artists
+
 Options:
-  -artist string
-      treat as specific artist
-  -bitrate string
-      convert to mp3 (V0=variable 256kbps, 320=constant 320kbps) (default "V0")
-  -collection
-      treat as collection of artists
-  -fast
-      skips album directory if starts w/ year
-  -fix
-      fixes incorrect track length, ie 1035:36:51
-  -force
-      processes all files, even if path info matches tag info
-  -modtime string
-      set modified timestamp of updated files
-  -version
-      print program version, then exit
-  -write
-      write changes to disk
+  --bitrate "BITRATE"
+    V0 (default)
+      convert to variable 256kbps mp3
+    320
+      convert to constant 320kbps mp3
+
+  --fast
+    skips album directory if starts w/ year
+
+  --fix
+    fixes incorrect track length, ie 1035:36:51
+
+  --force
+    processes all files, even if path info matches tag info
+
+  --write
+    write changes to disk
+
+Debug:
+  --version
+    print program version, then exit
+
 ```
 
 ## Purpose
@@ -70,21 +81,14 @@ within FLAC files. MP3 artwork embedding is included with `ffmpeg`.
 
 If `metaflac` not found, FLAC embedding will be skipped, but the program will continue without error.
 
-## Options
+## Mode
 
-### Artist (-artist "Artist Name")
+### Artist (--artist "Artist Name")
 
 Child directories of specified PATH, as well as files within PATH itself, are considered to be albums
 or live performances belonging to the specified artist.
 
-### Bitrate (-bitrate V0 OR -bitrate 320)
-
-Convert other audio formats to MP3 using `libmp3lame` encoding and either V0 (variable 256kbps) or 320
-(constant 320kbps) bitrate.
-
-To skip converting FLAC audio, include ` - FLAC` at the end of the album folder name.
-
-### Collection (-collection)
+### Collection (--collection)
 
 Immediate child directories of specified PATH are considered to be artists. Child directories of each
 artist are considered to be albums or live performances belonging to that artist.
@@ -93,25 +97,34 @@ In the event that the artist tag is not found, the artist folder name is used.
 
 To skip processing a child directory, include ` - ` in its name. Such as: `Grateful Dead - UNORGANIZED`
 
-### Fast (-fast)
+## Options
+
+### Bitrate (--bitrate V0 OR --bitrate 320)
+
+Convert other audio formats to MP3 using `libmp3lame` encoding and either V0 (variable 256kbps) or 320
+(constant 320kbps) bitrate.
+
+To skip converting FLAC audio, include ` - FLAC` at the end of the album folder name.
+
+### Fast (--fast)
 
 Skips album folder if starts with year without touching any of the individual audio files.
 
-### Fix (-fix)
+### Fix (--fix)
 
-Fixes incorrect track length (ie, 1035:36:51) by first removing all metadata, then adding metadata
-back separately.
+Fixes incorrect track length (ie, 1035:36:51) by removing all metadata, then adding metadata
+back in separate process.
 
-### Force (-force)
+### Force (--force)
 
 Processes each audio file regardless of whether or not the path info matches tag info.
 
-### Write (-write)
+### Write (--write)
 
-Consider running in simulation by not including the argument `-write`. This mode will print
-all changes to the console for review, but not make them.
+By not including `--write`, the process will run in simulation, printing all changes to
+the console for review.
 
-Once satisfied, run again including `-write` to actually make changes.
+Including `--write` will apply changes to disk.
 
 ## Developing
 
@@ -131,13 +144,13 @@ Ensure dependencies are installed and up-to-date with `dep`, run:
 
     dep ensure
 
-From within source path, run:
+From within source path, to build the binary, run:
 
-    go build
+    go install
 
-The binary will build to the current directory. To test by displaying usage, run:
+To test by displaying usage, run:
 
-    ./audiocc --help
+    audiocc --help
 
 ### Testing
 
@@ -145,21 +158,9 @@ From within source path, run:
 
     go test -cover -v ./...
 
-### Submitting a Pull Request
+### Contributing
 
-Fork repo on Github.
-
-From within source path, setup new remote, run:
-
-    git remote add myfork git@github.com:$GITHUB-USERNAME/audiocc.git
-
-Create a new branch to use for development, run:
-
-    git checkout -b new-branch
-
-Make your changes, add, commit and push to your Github fork.
-
-Back on Github, submit pull request.
+[Submit a Pull Request](SUBMIT_PR.md).
 
 ## License
 
