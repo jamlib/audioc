@@ -71,7 +71,7 @@ func createTestFiles(files []*testFile, t *testing.T) string {
 
 func TestPathInfo(t *testing.T) {
   tests := []struct {
-    base, path string
+    artist, base, path string
     pi *pathInfo
   }{
     { base: "dir1", path: "dir2/dir3/file1.ext",
@@ -85,10 +85,17 @@ func TestPathInfo(t *testing.T) {
       base: "/dir3/dir4/", path: "file2.ext",
       pi: &pathInfo{ Fullpath: "/dir3/dir4/file2.ext",
         Fulldir: "/dir3/dir4", Dir: "dir4", File: "file2", Ext: ".ext" },
+    },{
+      artist: "Artist", base: "/dir3/dir4/", path: "dir5/file2.ext",
+      pi: &pathInfo{ Fullpath: "/dir3/dir4/dir5/file2.ext",
+        Fulldir: "/dir3/dir4/dir5", Dir: "dir4/dir5", File: "file2", Ext: ".ext" },
     },
   }
 
   for x := range tests {
+    flags.Artist = tests[x].artist
+    defer func() { flags.Artist = "" }()
+
     pi := getPathInfo(tests[x].base, tests[x].path)
     if !reflect.DeepEqual(pi, tests[x].pi) {
       t.Errorf("Expected %v, got %v", tests[x].pi, pi)

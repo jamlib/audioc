@@ -10,6 +10,7 @@ import (
   "path/filepath"
 )
 
+const sep = string(os.PathSeparator)
 var imageExts = []string{ "jpeg", "jpg", "png" }
 var audioExts = []string{ "flac", "m4a", "mp3", "mp4", "shn", "wav" }
 
@@ -18,21 +19,30 @@ type pathInfo struct {
   Dir, File, Ext string
 }
 
-func getPathInfo(base, path string) *pathInfo {
-  base = filepath.Clean(base)
-  pi := &pathInfo{Fullpath: filepath.Join(base, path) }
+// split full path into pieces used to determine info
+func getPathInfo(basePath, filePath string) *pathInfo {
+  basePath = filepath.Clean(basePath)
+  pi := &pathInfo{Fullpath: filepath.Join(basePath, filePath) }
 
   pi.Fulldir, pi.File = filepath.Split(pi.Fullpath)
   pi.Fulldir = filepath.Clean(pi.Fulldir)
+  pi.Ext = filepath.Ext(pi.File)
 
-  pi.Dir = strings.TrimPrefix(pi.Fulldir, base)
-  pi.Dir = strings.TrimPrefix(pi.Dir, string(os.PathSeparator))
-  if pi.Dir == "" {
-    pi.Dir = filepath.Base(pi.Fulldir)
+  pi.File = strings.TrimSuffix(pi.File, pi.Ext)
+  pi.Ext = strings.ToLower(pi.Ext)
+
+  // if --artist mode, remove inner-most dir from basePath
+  // so it can be used as a source of info
+  if flags.Artist != "" {
+    basePath = filepath.Dir(basePath)
   }
 
-  pi.Ext = strings.ToLower(filepath.Ext(pi.File))
-  pi.File = strings.TrimSuffix(pi.File, pi.Ext)
+  pi.Dir = strings.TrimPrefix(pi.Fulldir, basePath)
+  pi.Dir = strings.TrimPrefix(pi.Dir, sep)
+  if pi.Dir == "" {
+    // use inner-most dir of full path
+    pi.Dir = filepath.Base(pi.Fulldir)
+  }
 
   return pi
 }
@@ -52,7 +62,7 @@ func checkDir(dir string) (string, error) {
 // separate dir from fullpath
 func onlyDir(path string) string {
   path, _ = filepath.Split(path)
-  path = strings.TrimSuffix(path, string(os.PathSeparator))
+  path = strings.TrimSuffix(path, sep)
   return path
 }
 
