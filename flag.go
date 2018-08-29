@@ -19,35 +19,62 @@ const printUsage = `
 audiocc v%s
 %s
 
-Usage: audiocc [OPTIONS] PATH
+Usage: audiocc [MODE] [OPTIONS] PATH
 %s
+Mode (specify only one):
+  --artist "NAME"
+    treat as specific artist
+
+  --collection
+    treat as collection of artists
+
 Options:
+  --bitrate "BITRATE"
+    V0 (default)
+      convert to variable 256kbps mp3
+    320
+      convert to constant 320kbps mp3
+
+  --fast
+    skips album directory if starts w/ year
+
+  --fix
+    fixes incorrect track length, ie 1035:36:51
+
+  --force
+    processes all files, even if path info matches tag info
+
+  --write
+    write changes to disk
+
+Debug:
+  --version
+    print program version, then exit
 `
 
 type Flags struct {
-  Artist, Bitrate, ModTime string
+  Artist, Bitrate string
   Collection, Fast, Fix, Force, Version, Write bool
 }
 
 var flags = Flags{}
 
 func init() {
+  // setup mode
+  flag.StringVar(&flags.Artist, "artist", "", "")
+  flag.BoolVar(&flags.Collection, "collection", false, "")
   // setup options
-  flag.StringVar(&flags.Artist, "artist", "", "treat as specific artist")
-  flag.StringVar(&flags.Bitrate, "bitrate", "V0", "convert to mp3 (V0=variable 256kbps, 320=constant 320kbps)")
-  flag.BoolVar(&flags.Collection, "collection", false, "treat as collection of artists")
-  flag.BoolVar(&flags.Fast, "fast", false, "skips album directory if starts w/ year")
-  flag.BoolVar(&flags.Fix, "fix", false, "fixes incorrect track length, ie 1035:36:51")
-  flag.BoolVar(&flags.Force, "force", false, "processes all files, even if path info matches tag info")
-  flag.StringVar(&flags.ModTime, "modtime", "", "set modified timestamp of updated files")
-  flag.BoolVar(&flags.Version, "version", false, "print program version, then exit")
-  flag.BoolVar(&flags.Write, "write", false, "write changes to disk")
+  flag.StringVar(&flags.Bitrate, "bitrate", "V0", "")
+  flag.BoolVar(&flags.Fast, "fast", false, "")
+  flag.BoolVar(&flags.Fix, "fix", false, "")
+  flag.BoolVar(&flags.Force, "force", false, "")
+  flag.BoolVar(&flags.Write, "write", false, "")
+  // detup debug options
+  flag.BoolVar(&flags.Version, "version", false, "")
 
   // --help
   flag.Usage = func() {
     fmt.Printf(printUsage, version, description, args)
-    // print options from built-in flag helper
-    flag.PrintDefaults()
     fmt.Println()
   }
 }
