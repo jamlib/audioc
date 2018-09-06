@@ -2,9 +2,7 @@ package main
 
 import (
   "os"
-  "strings"
   "testing"
-  "path/filepath"
   "encoding/json"
 
   "github.com/JamTools/goff/ffmpeg"
@@ -52,23 +50,6 @@ func TestSkipFast(t *testing.T) {
   }
 }
 
-func TestValidWorkdir(t *testing.T) {
-  tests := []struct {
-    a *audiocc
-    v bool
-  }{
-    { a: &audiocc{ Workdir: "" }, v: false },
-    { a: &audiocc{ Workdir: "test" }, v: true },
-  }
-
-  for i := range tests {
-    r := tests[i].a.validWorkdir() == nil
-    if r != tests[i].v {
-      t.Errorf("Expected %v, got %v", tests[i].v, r)
-    }
-  }
-}
-
 func TestProcessDirDNE(t *testing.T) {
   a := &audiocc{ DirEntry: "audiocc-dir-def-dne" }
   err := a.process()
@@ -101,7 +82,7 @@ func createTestProcessFiles(t *testing.T, files []*TestProcessFiles) (*audiocc, 
   return a, indexes
 }
 
-// also tests processArtwork()
+// also tests processArtwork(), processThreaded(), processIndex(), processMp3()
 func TestProcessMain(t *testing.T) {
   a, _ := createTestProcessFiles(t, []*TestProcessFiles{
     { "Phish/2003/2003.07.17 Bonner Springs, KS/1-01 Chalk Dust Torture.flac",
@@ -116,119 +97,28 @@ func TestProcessMain(t *testing.T) {
   })
   defer os.RemoveAll(a.DirEntry)
 
-  a.Workdir = "audiocc"
-
   flags.Write = true
   defer func() { flags.Write = false }()
 
   err := a.process()
+
+  // ensure no errors in process
   if err != nil {
     t.Errorf("Expected no error, got: %v", err.Error())
   }
-}
 
-func TestProcessThreaded(t *testing.T) {
-  // assume files within same directory
-  a, indexes := createTestProcessFiles(t, []*TestProcessFiles{
-    { "Phish/2003/2003.07.17 Bonner Springs, KS/1-01 Chalk Dust Torture.flac",
-      &ffprobe.Tags{},
-    },{
-      "dir2/file2.mp3",
-      &ffprobe.Tags{
-        Album: "2003.07.18 Alpine Valley, East Troy, WI",
-        Track: "1", Title: "Axilla I",
-      },
-    },
-  })
-  defer os.RemoveAll(a.DirEntry)
-
-  flags.Write = true
-  defer func() { flags.Write = false }()
-
-  r := a.processThreaded(indexes)
-
-  // trim dir entry, remove file from path
-  r = onlyDir(strings.TrimPrefix(r, a.DirEntry + string(os.PathSeparator)))
-
-  expected := "2003.07.18 Alpine Valley, East Troy, WI"
-  if r != expected {
-    t.Errorf("Expected %v, got %v", expected, r)
-  }
-}
-
-func TestProcessIndex(t *testing.T) {
-  a, _ := createTestProcessFiles(t, []*TestProcessFiles{
-    { "Phish/2003/2003.07.17 Bonner Springs, KS/1-01 Chalk Dust Torture.flac",
-      &ffprobe.Tags{},
-    },{
-      "dir2/file2.mp3",
-      &ffprobe.Tags{
-        Album: "2003.07.18 Alpine Valley, East Troy, WI",
-        Track: "1", Title: "Axilla I",
-      },
-    },
-  })
-  defer os.RemoveAll(a.DirEntry)
-
-  flags.Write = true
-  defer func() { flags.Write = false }()
-
-  tests := []struct {
-    result string
-  }{
-    { result: "2003.07.17 Bonner Springs, KS/1-1 Chalk Dust Torture.mp3" },
-    { result: "2003.07.18 Alpine Valley, East Troy, WI/1 Axilla I.mp3" },
+  // compare relative folder path & file name with expected result
+  fileResults := []string{
+    "2003.07.17 Bonner Springs, KS/1-1 Chalk Dust Torture.mp3",
+    "2003.07.18 Alpine Valley, East Troy, WI/1 Axilla I.mp3",
   }
 
-  for x := range tests {
-    r, err := a.processIndex(x)
-    if err != nil {
-      t.Errorf("Expected no error, got: %v", err.Error())
-    }
-
-    r = strings.TrimPrefix(r, a.DirEntry + string(os.PathSeparator))
-    if r != tests[x].result {
-      t.Errorf("Expected %v, got %v", tests[x].result, r)
+  files := filesByExtension(a.DirEntry, audioExts)
+  for x := range files {
+    if files[x] != fileResults[x] {
+      t.Errorf("Expected %v, got %v", fileResults[x], files[x])
     }
   }
-}
 
-func TestProcessMp3(t *testing.T) {
-  testFiles := []*testFile{
-    {"dir1/file1.flac", ""},
-    {"dir2/file2.mp3", ""},
-  }
-
-  dir := createTestFiles(testFiles, t)
-  defer os.RemoveAll(dir)
-
-  a := &audiocc{ DirEntry: dir, Ffmpeg: &ffmpeg.MockFfmpeg{} }
-
-  tests := []struct {
-    pi *pathInfo
-    i *info
-    result string
-  }{
-    { pi: getPathInfo(dir, testFiles[0].name),
-      i: &info{ Disc: "", Track: "01", Title: "You Enjoy Myself" },
-      result: "dir1/01 You Enjoy Myself.mp3",
-    },{
-      pi: getPathInfo(dir, testFiles[1].name),
-      i: &info{ Disc: "2", Track: "04", Title: "Twist" },
-      result: "dir2/2-04 Twist.mp3",
-    },
-  }
-
-  for x := range tests {
-    _, err := a.processMp3(tests[x].pi, tests[x].i)
-    if err != nil {
-      t.Errorf("Expected no error, got: %v", err.Error())
-    }
-
-    // TODO: actually read & compare json data encoded within file
-    _, err = os.Stat(filepath.Join(dir, tests[x].result))
-    if err != nil {
-      t.Errorf("Expected file '%v' not found", tests[x].result)
-    }
-  }
+  // TODO: actually read & compare json data encoded within file
 }
