@@ -8,6 +8,7 @@ import (
   "regexp"
   "strings"
   "runtime"
+  "io/ioutil"
   "path/filepath"
 
   "github.com/JamTools/goff/ffmpeg"
@@ -44,8 +45,8 @@ func main() {
   var workers = runtime.NumCPU()
   //workers = 1 // DEBUG in single-threaded mode
 
-  a := &audiocc{ Ffmpeg: ffm, Ffprobe: ffp, DirEntry: filepath.Clean(args[0]),
-    Workers: workers, Workdir: "audiocc" }
+  a := &audiocc{ Ffmpeg: ffm, Ffprobe: ffp, Workers: workers,
+    DirEntry: filepath.Clean(args[0]) }
 
   err = a.process()
   if err != nil {
@@ -56,7 +57,7 @@ func main() {
 // true if --collection & artist path contains " - "
 func skipArtistOnCollection(p string) bool {
   if flags.Collection {
-    pa := strings.Split(p, string(os.PathSeparator))
+    pa := strings.Split(p, sep)
     // first folder is artist
     if strings.Index(pa[0], " - ") != -1 {
       return true
@@ -68,7 +69,7 @@ func skipArtistOnCollection(p string) bool {
 // skip if album folder name contains year (--fast)
 func skipFast(p string) bool {
   if flags.Fast {
-    pa := strings.Split(p, string(os.PathSeparator))
+    pa := strings.Split(p, sep)
     // last folder is album
     t := &info{}
     t.fromAlbum(pa[len(pa)-1])
@@ -77,15 +78,6 @@ func skipFast(p string) bool {
     }
   }
   return false
-}
-
-// ensure workdir is not blank & matches only A-Za-z0-9-\s
-func (a *audiocc) validWorkdir() error {
-  m := regexp.MustCompile(`^[A-Za-z0-9-\s]*$`).FindString(a.Workdir)
-  if len(a.Workdir) > 0 && m == a.Workdir {
-    return nil
-  }
-  return fmt.Errorf("workdir must contain only: A-Za-z0-9-\\s")
 }
 
 // process album art once per folder of files
@@ -123,36 +115,29 @@ func (a *audiocc) process() error {
     return err
   }
 
-  // ensure workdir valid
-  err = a.validWorkdir()
-  if err != nil {
-    return err
-  }
-
-  fmt.Printf("\nProcessing: %v ...\n", a.DirEntry)
-
   // obtain audio file list
   a.Files = filesByExtension(a.DirEntry, audioExts)
 
   // group files by parent directory
   err = bundleFiles(a.DirEntry, a.Files, func(indexes []int) error {
-
     pi := getPathInfo(a.DirEntry, a.Files[indexes[0]])
+
+    fmt.Printf("\nProcessing: %v ...\n", pi.Fulldir)
+
     if skipArtistOnCollection(pi.Dir) || skipFast(pi.Dir) {
       return nil
     }
 
     // process artwork once per folder
+    // TODO: if parent & child folders contain no audio files and are not the root dir,
+    // check them for potential album artwork
     err = a.processArtwork(a.Files[indexes[0]])
     if err != nil {
       return err
     }
 
-    fmt.Println()
-    workDir := filepath.Join(pi.Fulldir, a.Workdir)
-
-    // ensure working dir exists
-    err = os.MkdirAll(workDir, 0777)
+    // create new random workdir within current path
+    a.Workdir, err = ioutil.TempDir(pi.Fulldir, "")
     if err != nil {
       return err
     }
@@ -162,10 +147,12 @@ func (a *audiocc) process() error {
     dir := onlyDir(path)
 
     // remove workDir
-    os.RemoveAll(workDir)
+    os.RemoveAll(a.Workdir)
 
     // if not same dir, rename directory to target dir
     if pi.Fulldir != dir {
+      // TODO: only rename to (1) when duplicate track numbers exist
+      // otherwise merge into existing directory
       _, err = renameFolder(pi.Fulldir, dir)
       return err
     }
@@ -226,7 +213,7 @@ func (a *audiocc) processIndex(index int) (string, error) {
   // info from path & filename
   mainInfo := &info{}
   mainInfo.fromFile(pi.File)
-  mainInfo.fromPath(pi.Dir, string(os.PathSeparator))
+  mainInfo.fromPath(pi.Dir)
 
   // info from embedded tags within audio file
   d, err := a.Ffprobe.GetData(pi.Fullpath)
@@ -247,7 +234,7 @@ func (a *audiocc) processIndex(index int) (string, error) {
     i.Artist = flags.Artist
   } else if flags.Collection {
     // artist comes from parent folder name
-    i.Artist = strings.Split(pi.Dir, string(os.PathSeparator))[0]
+    i.Artist = strings.Split(pi.Dir, sep)[0]
   }
 
   // build resulting path
@@ -309,13 +296,12 @@ func (a *audiocc) processMp3(pi *pathInfo, i *info) (string, error) {
     Disc: i.Disc, Track: i.Track, Title: i.Title, Artwork: a.Image }
 
   // save new file to Workdir subdir within current path
-  newFile := filepath.Join(pi.Fulldir, a.Workdir, i.toFile() + ".mp3")
+  newFile := filepath.Join(a.Workdir, i.toFile() + ".mp3")
 
   // process or convert to mp3
   c := &ffmpeg.Mp3Config{ pi.Fullpath, quality, newFile, ffmeta, flags.Fix }
   _, err := a.Ffmpeg.ToMp3(c)
   if err != nil {
-    fmt.Printf("File: %v, Error: %v\n\n", pi.Fullpath, err)
     return newFile, err
   }
 
@@ -347,5 +333,5 @@ func (a *audiocc) processMp3(pi *pathInfo, i *info) (string, error) {
     return file, nil
   }
 
-  return newFile, nil
+  return newFile, fmt.Errorf("File didn't have size")
 }
