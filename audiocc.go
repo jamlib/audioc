@@ -80,6 +80,45 @@ func skipFast(p string) bool {
   return false
 }
 
+// if parent folder does not contain audio files, copy any images files
+// TODO: tests where parent folder has album art, but not found with child folder
+// or embedded within file
+func (a *audiocc) processParentFolderArtwork(art *artwork, file string) {
+  fullpath := filepath.Join(a.DirEntry, file)
+  pf := filepath.Dir(filepath.Dir(fullpath))
+  if len(filepath.Base(pf)) > 0 {
+    // ensure parent folder has no audio files
+    hasAudio := false
+    for _, x := range filesByExtension(pf, audioExts) {
+      ia := strings.Split(x, sep)
+      if len(ia) == 1 {
+        hasAudio = true
+        break
+      }
+    }
+
+    // if parent folder has images
+    images := filesByExtension(pf, imageExts)
+    if len(images) > 0 && !hasAudio {
+      // copy images found with parent folder
+      hasImage := false
+      for _, y := range images {
+        ia := strings.Split(y, sep)
+        if len(ia) == 1 {
+          hasImage = true
+          _ = copyFile(filepath.Join(pf, y),
+            filepath.Join(filepath.Dir(fullpath), filepath.Base(y)))
+        }
+      }
+
+      // if image not set, try again with image files copied from parent dir
+      if hasImage {
+        a.Image, _ = art.process()
+      }
+    }
+  }
+}
+
 // process album art once per folder of files
 func (a *audiocc) processArtwork(file string) error {
   art := &artwork{ Ffmpeg: a.Ffmpeg, Ffprobe: a.Ffprobe,
@@ -98,6 +137,10 @@ func (a *audiocc) processArtwork(file string) error {
     a.Image, err = art.process()
     if err != nil {
       return err
+    }
+
+    if len(a.Image) == 0 {
+      a.processParentFolderArtwork(art, file)
     }
   }
 
@@ -122,15 +165,14 @@ func (a *audiocc) process() error {
   err = bundleFiles(a.DirEntry, a.Files, func(indexes []int) error {
     pi := getPathInfo(a.DirEntry, a.Files[indexes[0]])
 
-    fmt.Printf("\nProcessing: %v ...\n", pi.Fulldir)
-
+    // skip if possible
     if skipArtistOnCollection(pi.Dir) || skipFast(pi.Dir) {
       return nil
     }
 
+    fmt.Printf("\nProcessing: %v ...\n", pi.Fulldir)
+
     // process artwork once per folder
-    // TODO: if parent & child folders contain no audio files and are not the root dir,
-    // check them for potential album artwork
     err = a.processArtwork(a.Files[indexes[0]])
     if err != nil {
       return err
@@ -156,6 +198,8 @@ func (a *audiocc) process() error {
       _, err = renameFolder(pi.Fulldir, dir)
       return err
     }
+
+    // TODO: remove parent folder if no longer contains audio files
 
     return nil
   })
@@ -187,7 +231,7 @@ func (a *audiocc) processThreaded(indexes []int) string {
 
       for job := range jobs {
         var err error
-        dir, err = a.processIndex(job)
+        dir, err = a.processFile(job)
         if err != nil {
           fmt.Printf("\nError: %s\n", err.Error())
         }
@@ -207,13 +251,11 @@ func (a *audiocc) processThreaded(indexes []int) string {
   return saveDir
 }
 
-func (a *audiocc) processIndex(index int) (string, error) {
+func (a *audiocc) processFile(index int) (string, error) {
   pi := getPathInfo(a.DirEntry, a.Files[index])
 
   // info from path & filename
-  mainInfo := &info{}
-  mainInfo.fromFile(pi.File)
-  mainInfo.fromPath(pi.Dir)
+  i := newInfo(pi.Dir, pi.File)
 
   // info from embedded tags within audio file
   d, err := a.Ffprobe.GetData(pi.Fullpath)
@@ -221,7 +263,8 @@ func (a *audiocc) processIndex(index int) (string, error) {
     return pi.Fullpath, err
   }
 
-  i, match := mainInfo.matchProbeTags(d.Format.Tags)
+  // combine info w/ embedded tags
+  i, match := i.matchProbeTags(d.Format.Tags)
 
   // skip if sources match (unless --force)
   if match && !flags.Force {

@@ -82,7 +82,7 @@ func createTestProcessFiles(t *testing.T, files []*TestProcessFiles) (*audiocc, 
   return a, indexes
 }
 
-// also tests processArtwork(), processThreaded(), processIndex(), processMp3()
+// also tests processArtwork(), processThreaded(), processFile(), processMp3()
 func TestProcessMain(t *testing.T) {
   a, _ := createTestProcessFiles(t, []*TestProcessFiles{
     { "Phish/2003/2003.07.17 Bonner Springs, KS/1-01 Chalk Dust Torture.flac",
