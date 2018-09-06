@@ -1,6 +1,3 @@
-// info can be from:
-// id3 tag, path, filename
-
 package main
 
 import (
@@ -13,11 +10,21 @@ import (
   "github.com/JamTools/goff/ffprobe"
 )
 
+// audio file info derived from file path & embedded metadata
 type info struct {
   Artist, Album, Year, Month, Day string
   Disc, Track, Title string
 }
 
+// returns info from path
+func newInfo(dir, file string) *info {
+  i := &info{}
+  i.fromFile(file)
+  i.fromPath(dir)
+  return i
+}
+
+// returns album prefixed with fulldate, year, or nothing (if no year)
 func (i *info) toAlbum() string {
   if i.Year != "" {
     if i.Month != "" && i.Day != ""{
@@ -28,6 +35,8 @@ func (i *info) toAlbum() string {
   return i.Album
 }
 
+// returns filename string from Disc, Track, Title (ex: "1-01 Title.mp3")
+// without Disc (ex: "01 Title.mp3")
 func (i *info) toFile() string {
   var out string
   if len(i.Disc) > 0 {
@@ -37,7 +46,8 @@ func (i *info) toFile() string {
   return out + i.Track + " " + safeFilename(i.Title)
 }
 
-// compare info against ffprobe.Tags and combine into best info
+// compare file path info against ffprobe.Tags and combine into best info
+// return includes boolean if info sources match (no update necessary)
 func (i *info) matchProbeTags(p *ffprobe.Tags) (*info, bool) {
   // match Disc "1/2" as "1"
   p.Disc = regexp.MustCompile(`^\d+`).FindString(p.Disc)
@@ -50,14 +60,15 @@ func (i *info) matchProbeTags(p *ffprobe.Tags) (*info, bool) {
   }
   tagInfo.fromAlbum(p.Album)
 
+  // compare using safeFilename since info is derived from filename
   compare := tagInfo
   compare.Title = safeFilename(compare.Title)
+
   if *i != *compare {
     // combine infos
     result := tagInfo
-    if len(result.Album) < len(i.Album) {
-      result.Album = i.Album
-    }
+
+    // update Year, Month, Day, Disc, Track if not set
     if len(result.Year) == 0 {
       result.Year = i.Year
     }
@@ -73,6 +84,11 @@ func (i *info) matchProbeTags(p *ffprobe.Tags) (*info, bool) {
     if len(result.Track) == 0 {
       result.Track = i.Track
     }
+
+    // update Album, Title if longer
+    if len(result.Album) < len(i.Album) {
+      result.Album = i.Album
+    }
     if len(result.Title) < len(i.Title) {
       result.Title = i.Title
     }
@@ -83,6 +99,7 @@ func (i *info) matchProbeTags(p *ffprobe.Tags) (*info, bool) {
   return i, true
 }
 
+// determine Disc, Year, Month, Day, Album from album string
 func (i *info) fromAlbum(s string) {
   i.matchDiscOnly(s)
   s = i.matchDate(s)
@@ -92,6 +109,7 @@ func (i *info) fromAlbum(s string) {
   }
 }
 
+// determine Disc, Year, Month, Day, Track, Title from file string
 func (i *info) fromFile(s string) *info {
   s = i.matchDate(s)
   s = i.matchDiscTrack(s)
@@ -100,6 +118,7 @@ func (i *info) fromFile(s string) *info {
   return i
 }
 
+// derive info album info from nested folder path
 func (i *info) fromPath(p string) *info {
   // start inner-most folder, work out
   for _, s := range reverse(strings.Split(p, sep)) {
