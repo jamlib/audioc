@@ -4,12 +4,15 @@ import (
   "io"
   "os"
   "fmt"
-  "regexp"
   "image"
+  "regexp"
+  "strings"
   "io/ioutil"
   "path/filepath"
   _ "image/jpeg"
   _ "image/png"
+
+  "github.com/JamTools/goff/fsutil"
 )
 
 type artwork struct {
@@ -56,6 +59,23 @@ func (a *artwork) process() (string, error) {
   return a.Source, nil
 }
 
+// TODO: tests
+func (a *artwork) processWithParentDir() (string, error) {
+  _, err := a.process()
+  if err != nil {
+    return a.Source, err
+  }
+
+  if len(a.Source) == 0 {
+    a.Source, err = a.processParentFolderArtwork()
+    if err != nil {
+      return a.Source, err
+    }
+  }
+
+  return a.Source, nil
+}
+
 // extract & optimize embedded artwork
 func (a *artwork) embedded(width, height int) error {
   // extract image with ffmpeg
@@ -74,7 +94,7 @@ func (a *artwork) embedded(width, height int) error {
     }
 
     // use the smallest size
-    r, _ := nthFileSize([]string{src, opt}, true)
+    r, _ := fsutil.NthFileSize([]string{src, opt}, true)
 
     // if optimized is smaller, copy original to folder-orig.jpg if larger
     if r == opt {
@@ -104,7 +124,7 @@ func (a *artwork) fromPath() error {
 
   found := ""
   imgs := []string{}
-  images := filesByExtension(a.PathInfo.Fulldir, imageExts)
+  images := fsutil.FilesImage(a.PathInfo.Fulldir)
 
   // break if find specific match
   for i := range images {
@@ -119,7 +139,7 @@ func (a *artwork) fromPath() error {
 
   // if didn't find specific, try largest file size
   if len(imgs) > 0 && len(found) == 0 {
-    found, _ = nthFileSize(imgs, false)
+    found, _ = fsutil.NthFileSize(imgs, false)
   }
   if len(found) == 0 {
     return nil
@@ -145,7 +165,7 @@ func (a *artwork) fromPath() error {
     }
 
     // use smallest size
-    found, _ = nthFileSize([]string{found, opt}, true)
+    found, _ = fsutil.NthFileSize([]string{found, opt}, true)
   }
 
   err = a.copyAsFolderJpg(found)
@@ -156,11 +176,50 @@ func (a *artwork) fromPath() error {
   return nil
 }
 
+// if parent folder does not contain audio files, copy any images files
+// TODO: tests
+func (a *artwork) processParentFolderArtwork() (string, error) {
+  // if parent folder exists
+  pf := filepath.Dir(filepath.Dir(a.PathInfo.Fullpath))
+  if len(filepath.Base(pf)) > 0 {
+
+    // ensure parent folder contains no audio files
+    for _, x := range fsutil.FilesAudio(pf) {
+      ia := strings.Split(x, fsutil.PathSep)
+      if len(ia) == 1 {
+        return "", nil
+      }
+    }
+
+    // if parent folder has images
+    images := fsutil.FilesImage(pf)
+    if len(images) > 0 {
+      // copy images found with parent folder
+      hasImage := false
+      for _, y := range images {
+        ia := strings.Split(y, fsutil.PathSep)
+        if len(ia) == 1 {
+          hasImage = true
+          // copy ignoring any errors
+          _ = fsutil.CopyFile(filepath.Join(pf, y),
+            filepath.Join(filepath.Dir(a.PathInfo.Fullpath), filepath.Base(y)))
+        }
+      }
+
+      // if image not set, try again with image files copied from parent dir
+      if hasImage {
+        return a.process()
+      }
+    }
+  }
+  return "", nil
+}
+
 // copy src to folder-orig.jpg if larger
 func (a *artwork) copyAsFolderOrigJpg(src string) error {
   orig := filepath.Join(a.PathInfo.Fulldir, "folder-orig.jpg")
-  if isLarger(src, orig) {
-    err := copyFile(src, orig)
+  if fsutil.IsLarger(src, orig) {
+    err := fsutil.CopyFile(src, orig)
     if err != nil {
       return err
     }
@@ -184,7 +243,7 @@ func (a *artwork) copyAsFolderJpg(src string) error {
   }
 
   // copy to folder.jpg
-  err = copyFile(src, folder)
+  err = fsutil.CopyFile(src, folder)
   if err != nil {
     return err
   }
