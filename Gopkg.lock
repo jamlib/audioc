@@ -6,13 +6,14 @@
   name = "github.com/JamTools/goff"
   packages = [
     "ffmpeg",
-    "ffprobe"
+    "ffprobe",
+    "fsutil"
   ]
-  revision = "4089232b9d28bc4c795aa780e30c150cd903861c"
+  revision = "491af9674d149a88548c9c1ae48f998635e30739"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "fa6801e4286bec3c22c17f2713ecfea6325387ff160b05e2d8c07aab60e55af0"
+  inputs-digest = "d013f575a3692709d1c4af54c6a03c3798344e66e0bce1ad550ef05702fce0e6"
   solver-name = "gps-cdcl"
   solver-version = 1
