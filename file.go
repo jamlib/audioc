@@ -7,6 +7,7 @@ import (
   "sort"
   "regexp"
   "strings"
+  "strconv"
   "path/filepath"
 )
 
@@ -79,7 +80,9 @@ func filesByExtension(dir string, exts []string) []string {
 
     x := sort.SearchStrings(exts, ext)
     if x < len(exts) && exts[x] == ext {
+      // remove base directory
       p = p[len(dir):]
+      // remove prefixed path separator
       if p[0] == os.PathSeparator {
         p = p[1:]
       }
@@ -236,4 +239,80 @@ func renameFolder(src, dest string) (string, error) {
 
   err = os.Rename(src, dest)
   return dest, err
+}
+
+// if dest folder already exists, merge audio file if Disc/Track not already present
+// within. merge all images currently not present
+// TODO: tests
+func mergeFolder(src, dest string) (string, error) {
+  // return disc*1000+track as int & title for each audio file
+  infoFromAudio := func(file string) (int, string) {
+    // split filename from path
+    _, f := filepath.Split(file)
+    i := &info{}
+    i.fromFile(f)
+
+    disc, _ := strconv.Atoi(regexp.MustCompile(`^\d+`).FindString(i.Disc))
+    track, _ := strconv.Atoi(regexp.MustCompile(`^\d+`).FindString(i.Track))
+
+    return (disc*1000)+track, i.Title
+  }
+
+  // if folder already exists
+  _, err := os.Stat(dest)
+  if err == nil {
+    // build dest audio file info maps
+    destAudios := filesByExtension(dest, audioExts)
+    lookup := make(map[int]string, len(destAudios))
+    for _, destFile := range destAudios {
+      index, title := infoFromAudio(destFile)
+      lookup[index] = title
+    }
+
+    // copy only src audio files that don't already exist
+    copied := false
+    for _, srcFile := range filesByExtension(src, audioExts) {
+      index, title := infoFromAudio(srcFile)
+      if _, found := lookup[index]; !found {
+        srcPath := filepath.Join(src, srcFile)
+
+        // if not found, copy audio file
+        _, f := filepath.Split(srcFile)
+        err = copyFile(srcPath, filepath.Join(dest, f))
+        if err != nil {
+          return dest, err
+        }
+
+        // add to lookup, ensure copied is true
+        lookup[index] = title
+        copied = true
+
+        // remove source audio file
+        err = os.Remove(srcPath)
+        if err != nil {
+          return dest, err
+        }
+      }
+    }
+
+    // copy all image files (if copied at least one audio file)
+    if copied {
+      for _, imgFile := range filesByExtension(src, imageExts) {
+        _, img := filepath.Split(imgFile)
+        _ = copyFile(imgFile, filepath.Join(dest, img))
+      }
+    }
+
+    // if remaining audio files, rename to folder (x)
+    if len(filesByExtension(src, audioExts)) > 0 {
+      return renameFolder(src, dest)
+    }
+
+    // else delete folder
+    err = os.RemoveAll(src)
+    return dest, err
+  }
+
+  // folder doesn't exist
+  return renameFolder(src, dest)
 }
