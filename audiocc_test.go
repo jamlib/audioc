@@ -7,6 +7,7 @@ import (
 
   "github.com/JamTools/goff/ffmpeg"
   "github.com/JamTools/goff/ffprobe"
+  "github.com/JamTools/goff/fsutil"
 )
 
 func TestSkipArtistOnCollection(t *testing.T) {
@@ -68,17 +69,17 @@ func createTestProcessFiles(t *testing.T, files []*TestProcessFiles) (*audiocc, 
     Files: []string{}, Workers: 1 }
 
   indexes := []int{}
-  createFiles := []*testFile{}
+  createFiles := []*fsutil.TestFile{}
   for x := range files {
     // convert probe data tags to JSON
     b, _ := json.Marshal(files[x].data)
 
     indexes = append(indexes, x)
     a.Files = append(a.Files, files[x].path)
-    createFiles = append(createFiles, &testFile{files[x].path, string(b)})
+    createFiles = append(createFiles, &fsutil.TestFile{files[x].path, string(b)})
   }
 
-  a.DirEntry = createTestFiles(createFiles, t)
+  a.DirEntry = fsutil.CreateTestFiles(t, createFiles)
   return a, indexes
 }
 
@@ -113,7 +114,7 @@ func TestProcessMain(t *testing.T) {
     "2003.07.18 Alpine Valley, East Troy, WI/1 Axilla I.mp3",
   }
 
-  files := filesByExtension(a.DirEntry, audioExts)
+  files := fsutil.FilesAudio(a.DirEntry)
   for x := range files {
     if files[x] != fileResults[x] {
       t.Errorf("Expected %v, got %v", fileResults[x], files[x])

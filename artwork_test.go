@@ -10,8 +10,11 @@ import (
 
   "github.com/JamTools/goff/ffmpeg"
   "github.com/JamTools/goff/ffprobe"
+  "github.com/JamTools/goff/fsutil"
 )
 
+// passes a shared TempDir and labels: folder.jpg, folder-orig.jpg to
+// provided function
 func testArtwork(t *testing.T, testFunc func(td, f, fo string)) {
   td, err := ioutil.TempDir("", "")
   if err != nil {
@@ -22,15 +25,17 @@ func testArtwork(t *testing.T, testFunc func(td, f, fo string)) {
   testFunc(td, "folder.jpg", "folder-orig.jpg")
 }
 
+// creates test image files into temp directory which is passed to
+// provided function
 func testArtworkFiles(t *testing.T,
   testFiles map[string]string, testFunc func(dir string)) {
 
-  files := []*testFile{}
+  files := []*fsutil.TestFile{}
   for k, v := range testFiles {
-    files = append(files, &testFile{k, v})
+    files = append(files, &fsutil.TestFile{k, v})
   }
 
-  dir := createTestFiles(files, t)
+  dir := fsutil.CreateTestFiles(t, files)
   defer os.RemoveAll(dir)
 
   testFunc(dir)
