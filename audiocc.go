@@ -193,13 +193,20 @@ func (a *audiocc) process() error {
 
     // if not same dir, rename directory to target dir
     if pi.Fulldir != dir {
-      // TODO: only rename to (1) when duplicate track numbers exist
-      // otherwise merge into existing directory
-      _, err = renameFolder(pi.Fulldir, dir)
-      return err
+      _, err = mergeFolder(pi.Fulldir, dir)
+      if err != nil {
+        return err
+      }
     }
 
-    // TODO: remove parent folder if no longer contains audio files
+    // remove parent folder if no longer contains audio files
+    parentDir := filepath.Dir(pi.Fulldir)
+    if len(filesByExtension(parentDir, audioExts)) == 0 {
+      err = os.RemoveAll(parentDir)
+      if err != nil {
+        return err
+      }
+    }
 
     return nil
   })
