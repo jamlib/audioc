@@ -1,19 +1,15 @@
 package main
 
 import (
-  "io"
   "os"
   "fmt"
-  "sort"
   "regexp"
   "strings"
   "strconv"
   "path/filepath"
-)
 
-const sep = string(os.PathSeparator)
-var imageExts = []string{ "jpeg", "jpg", "png" }
-var audioExts = []string{ "flac", "m4a", "mp3", "mp4", "shn", "wav" }
+  "github.com/JamTools/goff/fsutil"
+)
 
 type pathInfo struct {
   Fullpath, Fulldir string
@@ -39,7 +35,7 @@ func getPathInfo(basePath, filePath string) *pathInfo {
   }
 
   pi.Dir = strings.TrimPrefix(pi.Fulldir, basePath)
-  pi.Dir = strings.TrimPrefix(pi.Dir, sep)
+  pi.Dir = strings.TrimPrefix(pi.Dir, fsutil.PathSep)
   if pi.Dir == "" {
     // use inner-most dir of full path
     pi.Dir = filepath.Base(pi.Fulldir)
@@ -63,44 +59,8 @@ func checkDir(dir string) (string, error) {
 // separate dir from fullpath
 func onlyDir(path string) string {
   path, _ = filepath.Split(path)
-  path = strings.TrimSuffix(path, sep)
+  path = strings.TrimSuffix(path, fsutil.PathSep)
   return path
-}
-
-func filesByExtension(dir string, exts []string) []string {
-  files := []string{}
-
-  // closure to pass to filepath.Walk
-  walkFunc := func(p string, f os.FileInfo, err error) error {
-    ext := filepath.Ext(p)
-    if len(ext) == 0 {
-      return nil
-    }
-    ext = strings.ToLower(ext[1:])
-
-    x := sort.SearchStrings(exts, ext)
-    if x < len(exts) && exts[x] == ext {
-      // remove base directory
-      p = p[len(dir):]
-      // remove prefixed path separator
-      if p[0] == os.PathSeparator {
-        p = p[1:]
-      }
-      files = append(files, p)
-    }
-
-    return err
-  }
-
-  err := filepath.Walk(dir, walkFunc)
-  if err != nil {
-    return []string{}
-  }
-  // must sort: nested directories' files list first
-  // char / sorts before A-Za-z0-9
-  sort.Strings(files)
-
-  return files
 }
 
 // group sorted files by common directory
@@ -136,79 +96,6 @@ func bundleFiles(dir string, files []string, f func(bundle []int) error) error {
 // strip out characters from filename
 func safeFilename(f string) string {
   return regexp.MustCompile(`[^A-Za-z0-9-'!?& _()]+`).ReplaceAllString(f, "")
-}
-
-// index of smallest/largest file in slice of files
-func nthFileSize(files []string, smallest bool) (string, error) {
-  sizes := []int64{}
-
-  found := -1
-  for i := range files {
-    in, err := os.Open(files[i])
-    if err != nil {
-      return "", err
-    }
-    defer in.Close()
-
-    info, err := in.Stat()
-    if err != nil {
-      return "", err
-    }
-
-    sizes = append(sizes, info.Size())
-    if found == -1 || (smallest && info.Size() < sizes[found]) ||
-      (!smallest && info.Size() > sizes[found]) {
-      found = i
-    }
-  }
-
-  if found == -1 {
-    return "", fmt.Errorf("File not found")
-  }
-  return files[found], nil
-}
-
-// true if destination does not exist or src has larger file size
-func isLarger(file, newFile string) bool {
-  f, err := os.Open(file)
-  defer f.Close()
-  if err != nil {
-    return false
-  }
-
-  f2, err := os.Open(newFile)
-  defer f2.Close()
-
-  if err == nil {
-    fn, err := nthFileSize([]string{ file, newFile }, false)
-    if err != nil || fn == newFile {
-      return false
-    }
-  }
-
-  return true
-}
-
-func copyFile(srcPath, destPath string) (err error) {
-  srcFile, err := os.Open(srcPath)
-  if err != nil {
-    return
-  }
-  defer srcFile.Close()
-
-  destFile, err := os.Create(destPath)
-  if err != nil {
-    return
-  }
-  defer destFile.Close()
-
-  _, err = io.Copy(destFile, srcFile)
-  if err != nil {
-    return
-  }
-
-  err = destFile.Sync()
-  return
 }
 
 // if dir already exists, prepend (x) to folder name
@@ -262,7 +149,7 @@ func mergeFolder(src, dest string) (string, error) {
   _, err := os.Stat(dest)
   if err == nil {
     // build dest audio file info maps
-    destAudios := filesByExtension(dest, audioExts)
+    destAudios := fsutil.FilesAudio(dest)
     lookup := make(map[int]string, len(destAudios))
     for _, destFile := range destAudios {
       index, title := infoFromAudio(destFile)
@@ -271,14 +158,14 @@ func mergeFolder(src, dest string) (string, error) {
 
     // copy only src audio files that don't already exist
     copied := false
-    for _, srcFile := range filesByExtension(src, audioExts) {
+    for _, srcFile := range fsutil.FilesAudio(src) {
       index, title := infoFromAudio(srcFile)
       if _, found := lookup[index]; !found {
         srcPath := filepath.Join(src, srcFile)
 
         // if not found, copy audio file
         _, f := filepath.Split(srcFile)
-        err = copyFile(srcPath, filepath.Join(dest, f))
+        err = fsutil.CopyFile(srcPath, filepath.Join(dest, f))
         if err != nil {
           return dest, err
         }
@@ -297,14 +184,14 @@ func mergeFolder(src, dest string) (string, error) {
 
     // copy all image files (if copied at least one audio file)
     if copied {
-      for _, imgFile := range filesByExtension(src, imageExts) {
+      for _, imgFile := range fsutil.FilesImage(src) {
         _, img := filepath.Split(imgFile)
-        _ = copyFile(imgFile, filepath.Join(dest, img))
+        _ = fsutil.CopyFile(imgFile, filepath.Join(dest, img))
       }
     }
 
     // if remaining audio files, rename to folder (x)
-    if len(filesByExtension(src, audioExts)) > 0 {
+    if len(fsutil.FilesAudio(src)) > 0 {
       return renameFolder(src, dest)
     }
 
