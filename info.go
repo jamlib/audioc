@@ -8,6 +8,7 @@ import (
   "strings"
 
   "github.com/JamTools/goff/ffprobe"
+  "github.com/JamTools/goff/fsutil"
 )
 
 // audio file info derived from file path & embedded metadata
@@ -49,12 +50,11 @@ func (i *info) toFile() string {
 // compare file path info against ffprobe.Tags and combine into best info
 // return includes boolean if info sources match (no update necessary)
 func (i *info) matchProbeTags(p *ffprobe.Tags) (*info, bool) {
-  // match Disc "1/2" as "1"
-  p.Disc = regexp.MustCompile(`^\d+`).FindString(p.Disc)
-
+  // build info from ffprobe.Tags
   tagInfo := &info{
     Artist: p.Artist,
-    Disc: p.Disc,
+    // match Disc "1/2" as "1"
+    Disc: regexp.MustCompile(`^\d+`).FindString(p.Disc),
     Track: p.Track,
     Title: matchAlbumOrTitle(p.Title),
   }
@@ -63,6 +63,8 @@ func (i *info) matchProbeTags(p *ffprobe.Tags) (*info, bool) {
   // compare using safeFilename since info is derived from filename
   compare := tagInfo
   compare.Title = safeFilename(compare.Title)
+
+  // TODO: ensure disc/track are evenly padded
 
   if *i != *compare {
     // combine infos
@@ -121,7 +123,7 @@ func (i *info) fromFile(s string) *info {
 // derive info album info from nested folder path
 func (i *info) fromPath(p string) *info {
   // start inner-most folder, work out
-  for _, s := range reverse(strings.Split(p, sep)) {
+  for _, s := range reverse(strings.Split(p, fsutil.PathSep)) {
     i.fromAlbum(s)
   }
   return i

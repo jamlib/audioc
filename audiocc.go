@@ -13,6 +13,7 @@ import (
 
   "github.com/JamTools/goff/ffmpeg"
   "github.com/JamTools/goff/ffprobe"
+  "github.com/JamTools/goff/fsutil"
 )
 
 type audiocc struct {
@@ -57,7 +58,7 @@ func main() {
 // true if --collection & artist path contains " - "
 func skipArtistOnCollection(p string) bool {
   if flags.Collection {
-    pa := strings.Split(p, sep)
+    pa := strings.Split(p, fsutil.PathSep)
     // first folder is artist
     if strings.Index(pa[0], " - ") != -1 {
       return true
@@ -69,7 +70,7 @@ func skipArtistOnCollection(p string) bool {
 // skip if album folder name contains year (--fast)
 func skipFast(p string) bool {
   if flags.Fast {
-    pa := strings.Split(p, sep)
+    pa := strings.Split(p, fsutil.PathSep)
     // last folder is album
     t := &info{}
     t.fromAlbum(pa[len(pa)-1])
@@ -78,45 +79,6 @@ func skipFast(p string) bool {
     }
   }
   return false
-}
-
-// if parent folder does not contain audio files, copy any images files
-// TODO: tests where parent folder has album art, but not found with child folder
-// or embedded within file
-func (a *audiocc) processParentFolderArtwork(art *artwork, file string) {
-  fullpath := filepath.Join(a.DirEntry, file)
-  pf := filepath.Dir(filepath.Dir(fullpath))
-  if len(filepath.Base(pf)) > 0 {
-    // ensure parent folder has no audio files
-    hasAudio := false
-    for _, x := range filesByExtension(pf, audioExts) {
-      ia := strings.Split(x, sep)
-      if len(ia) == 1 {
-        hasAudio = true
-        break
-      }
-    }
-
-    // if parent folder has images
-    images := filesByExtension(pf, imageExts)
-    if len(images) > 0 && !hasAudio {
-      // copy images found with parent folder
-      hasImage := false
-      for _, y := range images {
-        ia := strings.Split(y, sep)
-        if len(ia) == 1 {
-          hasImage = true
-          _ = copyFile(filepath.Join(pf, y),
-            filepath.Join(filepath.Dir(fullpath), filepath.Base(y)))
-        }
-      }
-
-      // if image not set, try again with image files copied from parent dir
-      if hasImage {
-        a.Image, _ = art.process()
-      }
-    }
-  }
 }
 
 // process album art once per folder of files
@@ -134,13 +96,9 @@ func (a *audiocc) processArtwork(file string) error {
       return err
     }
 
-    a.Image, err = art.process()
+    a.Image, err = art.processWithParentDir()
     if err != nil {
       return err
-    }
-
-    if len(a.Image) == 0 {
-      a.processParentFolderArtwork(art, file)
     }
   }
 
@@ -159,7 +117,7 @@ func (a *audiocc) process() error {
   }
 
   // obtain audio file list
-  a.Files = filesByExtension(a.DirEntry, audioExts)
+  a.Files = fsutil.FilesAudio(a.DirEntry)
 
   // group files by parent directory
   err = bundleFiles(a.DirEntry, a.Files, func(indexes []int) error {
@@ -201,7 +159,7 @@ func (a *audiocc) process() error {
 
     // remove parent folder if no longer contains audio files
     parentDir := filepath.Dir(pi.Fulldir)
-    if len(filesByExtension(parentDir, audioExts)) == 0 {
+    if len(fsutil.FilesAudio(parentDir)) == 0 {
       err = os.RemoveAll(parentDir)
       if err != nil {
         return err
@@ -270,6 +228,14 @@ func (a *audiocc) processFile(index int) (string, error) {
     return pi.Fullpath, err
   }
 
+  // set artist
+  if flags.Artist != "" {
+    i.Artist = flags.Artist
+  }
+  if i.Artist == "" {
+    i.Artist = d.Format.Tags.Artist
+  }
+
   // combine info w/ embedded tags
   i, match := i.matchProbeTags(d.Format.Tags)
 
@@ -284,7 +250,7 @@ func (a *audiocc) processFile(index int) (string, error) {
     i.Artist = flags.Artist
   } else if flags.Collection {
     // artist comes from parent folder name
-    i.Artist = strings.Split(pi.Dir, sep)[0]
+    i.Artist = strings.Split(pi.Dir, fsutil.PathSep)[0]
   }
 
   // build resulting path
