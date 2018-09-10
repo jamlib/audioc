@@ -1,4 +1,4 @@
-package main
+package albumart
 
 import (
   "io"
@@ -15,9 +15,10 @@ import (
   "github.com/JamTools/goff/fsutil"
 )
 
-type artwork struct {
+type AlbumArt struct {
   TempDir string
-  PathInfo *pathInfo
+  Fullpath, Fulldir string
+  WithParentDir bool
   Source string
   Ffmpeg interface {
     OptimizeAlbumArt(s, d string) (string, error)
@@ -30,7 +31,7 @@ type artwork struct {
 }
 
 // uses optimized embedded artwork OR optimized artwork within file path
-func (a *artwork) process() (string, error) {
+func Process(a *AlbumArt) (string, error) {
   // create temporary directory to work out of
   td, err := ioutil.TempDir("", "")
   if err != nil {
@@ -56,17 +57,7 @@ func (a *artwork) process() (string, error) {
     }
   }
 
-  return a.Source, nil
-}
-
-// TODO: tests
-func (a *artwork) processWithParentDir() (string, error) {
-  _, err := a.process()
-  if err != nil {
-    return a.Source, err
-  }
-
-  if len(a.Source) == 0 {
+  if a.WithParentDir && len(a.Source) == 0 {
     a.Source, err = a.processParentFolderArtwork()
     if err != nil {
       return a.Source, err
@@ -77,10 +68,10 @@ func (a *artwork) processWithParentDir() (string, error) {
 }
 
 // extract & optimize embedded artwork
-func (a *artwork) embedded(width, height int) error {
+func (a *AlbumArt) embedded(width, height int) error {
   // extract image with ffmpeg
   src := filepath.Join(a.TempDir, "embedded-orig.jpg")
-  _, err := a.Ffmpeg.Exec([]string{ "-y", "-i", a.PathInfo.Fullpath, src }...)
+  _, err := a.Ffmpeg.Exec([]string{ "-y", "-i", a.Fullpath, src }...)
   if err != nil {
     return err
   }
@@ -116,7 +107,7 @@ func (a *artwork) embedded(width, height int) error {
 }
 
 // iterate to find best image, then optimize
-func (a *artwork) fromPath() error {
+func (a *AlbumArt) fromPath() error {
   // specific names that take precedence over file size
   matches := []string{
     `^(?i)folder\.jpg$`,
@@ -124,11 +115,11 @@ func (a *artwork) fromPath() error {
 
   found := ""
   imgs := []string{}
-  images := fsutil.FilesImage(a.PathInfo.Fulldir)
+  images := fsutil.FilesImage(a.Fulldir)
 
   // break if find specific match
   for i := range images {
-    imgs = append(imgs, filepath.Join(a.PathInfo.Fulldir, images[i]))
+    imgs = append(imgs, filepath.Join(a.Fulldir, images[i]))
     for x := range matches {
       if regexp.MustCompile(matches[x]).MatchString(images[i]) {
         found = imgs[i]
@@ -178,9 +169,9 @@ func (a *artwork) fromPath() error {
 
 // if parent folder does not contain audio files, copy any images files
 // TODO: tests
-func (a *artwork) processParentFolderArtwork() (string, error) {
+func (a *AlbumArt) processParentFolderArtwork() (string, error) {
   // if parent folder exists
-  pf := filepath.Dir(filepath.Dir(a.PathInfo.Fullpath))
+  pf := filepath.Dir(filepath.Dir(a.Fullpath))
   if len(filepath.Base(pf)) > 0 {
 
     // ensure parent folder contains no audio files
@@ -202,13 +193,13 @@ func (a *artwork) processParentFolderArtwork() (string, error) {
           hasImage = true
           // copy ignoring any errors
           _ = fsutil.CopyFile(filepath.Join(pf, y),
-            filepath.Join(filepath.Dir(a.PathInfo.Fullpath), filepath.Base(y)))
+            filepath.Join(filepath.Dir(a.Fullpath), filepath.Base(y)))
         }
       }
 
       // if image not set, try again with image files copied from parent dir
       if hasImage {
-        return a.process()
+        return Process(a)
       }
     }
   }
@@ -216,8 +207,8 @@ func (a *artwork) processParentFolderArtwork() (string, error) {
 }
 
 // copy src to folder-orig.jpg if larger
-func (a *artwork) copyAsFolderOrigJpg(src string) error {
-  orig := filepath.Join(a.PathInfo.Fulldir, "folder-orig.jpg")
+func (a *AlbumArt) copyAsFolderOrigJpg(src string) error {
+  orig := filepath.Join(a.Fulldir, "folder-orig.jpg")
   if fsutil.IsLarger(src, orig) {
     err := fsutil.CopyFile(src, orig)
     if err != nil {
@@ -228,8 +219,8 @@ func (a *artwork) copyAsFolderOrigJpg(src string) error {
 }
 
 // update folder.jpg & folder-orig.jpg
-func (a *artwork) copyAsFolderJpg(src string) error {
-  folder := filepath.Join(a.PathInfo.Fulldir, "folder.jpg")
+func (a *AlbumArt) copyAsFolderJpg(src string) error {
+  folder := filepath.Join(a.Fulldir, "folder.jpg")
 
   // skip if src already is folder.jpg
   if src == folder {

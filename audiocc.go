@@ -14,6 +14,7 @@ import (
   "github.com/JamTools/goff/ffmpeg"
   "github.com/JamTools/goff/ffprobe"
   "github.com/JamTools/goff/fsutil"
+  "github.com/JamTools/audiocc/albumart"
 )
 
 type audiocc struct {
@@ -83,20 +84,22 @@ func skipFast(p string) bool {
 
 // process album art once per folder of files
 func (a *audiocc) processArtwork(file string) error {
-  art := &artwork{ Ffmpeg: a.Ffmpeg, Ffprobe: a.Ffprobe,
-    ImgDecode: image.DecodeConfig,
-    PathInfo: getPathInfo(a.DirEntry, file) }
+  pi := getPathInfo(a.DirEntry, file)
+
+  art := &albumart.AlbumArt{ Ffmpeg: a.Ffmpeg, Ffprobe: a.Ffprobe,
+    ImgDecode: image.DecodeConfig, WithParentDir: true,
+    Fullpath: pi.Fullpath, Fulldir: pi.Fulldir }
 
   if flags.Write {
     var err error
 
     // probe to determine if has embedded artwork
-    _, err = a.Ffprobe.GetData(art.PathInfo.Fullpath)
+    _, err = a.Ffprobe.GetData(art.Fullpath)
     if err != nil {
       return err
     }
 
-    a.Image, err = art.processWithParentDir()
+    a.Image, err = albumart.Process(art)
     if err != nil {
       return err
     }

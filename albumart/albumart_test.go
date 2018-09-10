@@ -1,4 +1,4 @@
-package main
+package albumart
 
 import (
   "io"
@@ -64,14 +64,14 @@ func TestArtworkProcess(t *testing.T) {
         return c, "", nil
       }
 
-      a := &artwork{ TempDir: td,
+      a := &AlbumArt{ TempDir: td,
         Ffmpeg: &ffmpeg.MockFfmpeg{ Embedded: tests[i].embedded }, ImgDecode: imageDecode,
         Ffprobe: &ffprobe.MockFfprobe{ Width: tests[i].width, Embedded: tests[i].embedded } }
 
       testArtworkFiles(t, tests[i].files, func(dir string) {
-        a.PathInfo = &pathInfo{ Fulldir: dir }
+        a.Fulldir = dir
 
-        _, err := a.process()
+        _, err := Process(a)
         if err != nil {
           t.Fatal(err)
         }
@@ -105,10 +105,10 @@ func TestArtworkEmbedded(t *testing.T) {
     }
 
     for i := range tests {
-      a := &artwork{ Ffmpeg: &ffmpeg.MockFfmpeg{ Embedded: tests[i].embedded }, TempDir: td }
+      a := &AlbumArt{ Ffmpeg: &ffmpeg.MockFfmpeg{ Embedded: tests[i].embedded }, TempDir: td }
 
       testArtworkFiles(t, tests[i].files, func(dir string) {
-        a.PathInfo = &pathInfo{ Fulldir: dir }
+        a.Fulldir = dir
 
         err := a.embedded(tests[i].width, 1)
         if err != nil {
@@ -150,10 +150,10 @@ func TestArtworkFromPath(t *testing.T) {
         return c, "", nil
       }
 
-      a := &artwork{ Ffmpeg: &ffmpeg.MockFfmpeg{}, TempDir: td, ImgDecode: imageDecode }
+      a := &AlbumArt{ Ffmpeg: &ffmpeg.MockFfmpeg{}, TempDir: td, ImgDecode: imageDecode }
 
       testArtworkFiles(t, tests[i].files, func(dir string) {
-        a.PathInfo = &pathInfo{ Fulldir: dir }
+        a.Fulldir = dir
 
         err := a.fromPath()
         if err != nil {
@@ -198,7 +198,7 @@ func TestArtworkCopyAsFolderJpg(t *testing.T) {
 
       for i := range tests {
         testArtworkFiles(t, tests[i].files, func(dir2 string) {
-          a := &artwork{ PathInfo: &pathInfo{ Fulldir: dir2 } }
+          a := &AlbumArt{ Fulldir: dir2 }
 
           err := a.copyAsFolderJpg(filepath.Join(dir, tests[i].key))
           if err != nil {
