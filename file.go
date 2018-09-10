@@ -5,7 +5,6 @@ import (
   "fmt"
   "regexp"
   "strings"
-  "strconv"
   "path/filepath"
 
   "github.com/JamTools/goff/fsutil"
@@ -96,110 +95,4 @@ func bundleFiles(dir string, files []string, f func(bundle []int) error) error {
 // strip out characters from filename
 func safeFilename(f string) string {
   return regexp.MustCompile(`[^A-Za-z0-9-'!?& _()]+`).ReplaceAllString(f, "")
-}
-
-// if dir already exists, prepend (x) to folder name
-// increment (x) until dir not found
-func renameFolder(src, dest string) (string, error) {
-  _, err := os.Stat(dest)
-  if err == nil {
-    x := 1
-    found := true
-    for found {
-      newDir := fmt.Sprintf("%v (%v)", dest, x)
-
-      _, err := os.Stat(newDir)
-      if err != nil {
-        dest = newDir
-        found = false
-      }
-
-      x += 1
-    }
-  }
-
-  // trim off last path element and create full path
-  err = os.MkdirAll(filepath.Dir(dest), 0777)
-  if err != nil {
-    return dest, err
-  }
-
-  err = os.Rename(src, dest)
-  return dest, err
-}
-
-// if dest folder already exists, merge audio file if Disc/Track not already present
-// within. merge all images currently not present
-// TODO: tests
-func mergeFolder(src, dest string) (string, error) {
-  // return disc*1000+track as int & title for each audio file
-  infoFromAudio := func(file string) (int, string) {
-    // split filename from path
-    _, f := filepath.Split(file)
-    i := &info{}
-    i.fromFile(f)
-
-    disc, _ := strconv.Atoi(regexp.MustCompile(`^\d+`).FindString(i.Disc))
-    track, _ := strconv.Atoi(regexp.MustCompile(`^\d+`).FindString(i.Track))
-
-    return (disc*1000)+track, i.Title
-  }
-
-  // if folder already exists
-  _, err := os.Stat(dest)
-  if err == nil {
-    // build dest audio file info maps
-    destAudios := fsutil.FilesAudio(dest)
-    lookup := make(map[int]string, len(destAudios))
-    for _, destFile := range destAudios {
-      index, title := infoFromAudio(destFile)
-      lookup[index] = title
-    }
-
-    // copy only src audio files that don't already exist
-    copied := false
-    for _, srcFile := range fsutil.FilesAudio(src) {
-      index, title := infoFromAudio(srcFile)
-      if _, found := lookup[index]; !found {
-        srcPath := filepath.Join(src, srcFile)
-
-        // if not found, copy audio file
-        _, f := filepath.Split(srcFile)
-        err = fsutil.CopyFile(srcPath, filepath.Join(dest, f))
-        if err != nil {
-          return dest, err
-        }
-
-        // add to lookup, ensure copied is true
-        lookup[index] = title
-        copied = true
-
-        // remove source audio file
-        err = os.Remove(srcPath)
-        if err != nil {
-          return dest, err
-        }
-      }
-    }
-
-    // copy all image files (if copied at least one audio file)
-    if copied {
-      for _, imgFile := range fsutil.FilesImage(src) {
-        _, img := filepath.Split(imgFile)
-        _ = fsutil.CopyFile(imgFile, filepath.Join(dest, img))
-      }
-    }
-
-    // if remaining audio files, rename to folder (x)
-    if len(fsutil.FilesAudio(src)) > 0 {
-      return renameFolder(src, dest)
-    }
-
-    // else delete folder
-    err = os.RemoveAll(src)
-    return dest, err
-  }
-
-  // folder doesn't exist
-  return renameFolder(src, dest)
 }

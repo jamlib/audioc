@@ -8,8 +8,6 @@ import (
   "testing"
   "io/ioutil"
   "path/filepath"
-
-  "github.com/JamTools/goff/fsutil"
 )
 
 func tmpFile(t *testing.T, input string, f func(in *os.File)) {
@@ -155,38 +153,6 @@ func TestSafeFilename(t *testing.T) {
     r := safeFilename(tests[i][0])
     if r != tests[i][1] {
       t.Errorf("Expected %v, got %v", tests[i][1], r)
-    }
-  }
-}
-
-func TestRenameFolder(t *testing.T) {
-  testFiles := []*fsutil.TestFile{
-    {"dir1/file1", "abcde"},
-    {"dir2/file2", "a"},
-    {"dir3/file3", ""},
-    {"dir4/file4", ""},
-    {"dir6/file6", ""},
-  }
-
-  dir := fsutil.CreateTestFiles(t, testFiles)
-  defer os.RemoveAll(dir)
-
-  tests := [][]string{
-    {"dir2", "dir1", "dir1 (1)"},
-    {"dir3", "dir1", "dir1 (2)"},
-    {"dir4", "dir5", "dir5"},
-    {"dir6", "path2/dir5", "path2/dir5"},
-  }
-
-  for i := 0; i < len(tests); i++ {
-    r, err := renameFolder(filepath.Join(dir, tests[i][0]), filepath.Join(dir, tests[i][1]))
-    if err != nil {
-      t.Errorf("Unexpected error %v", err.Error())
-    }
-
-    exp := filepath.Join(dir, tests[i][2])
-    if r != exp {
-      t.Errorf("Expected %v, got %v", exp, r)
     }
   }
 }

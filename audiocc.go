@@ -7,6 +7,7 @@ import (
   "image"
   "regexp"
   "strings"
+  "strconv"
   "runtime"
   "io/ioutil"
   "path/filepath"
@@ -154,7 +155,17 @@ func (a *audiocc) process() error {
 
     // if not same dir, rename directory to target dir
     if pi.Fulldir != dir {
-      _, err = mergeFolder(pi.Fulldir, dir)
+      _, err = fsutil.MergeFolder(pi.Fulldir, dir, func (f string) (int, string) {
+        // split filename from path
+        _, file := filepath.Split(f)
+        i := &info{}
+        i.fromFile(file)
+
+        disc, _ := strconv.Atoi(regexp.MustCompile(`^\d+`).FindString(i.Disc))
+        track, _ := strconv.Atoi(regexp.MustCompile(`^\d+`).FindString(i.Track))
+
+        return (disc*1000)+track, i.Title
+      })
       if err != nil {
         return err
       }
