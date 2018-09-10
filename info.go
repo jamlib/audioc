@@ -123,8 +123,9 @@ func (i *info) fromFile(s string) *info {
 // derive info album info from nested folder path
 func (i *info) fromPath(p string) *info {
   // start inner-most folder, work out
-  for _, s := range reverse(strings.Split(p, fsutil.PathSep)) {
-    i.fromAlbum(s)
+  sa := strings.Split(p, fsutil.PathSep)
+  for x := len(sa)-1; x >= 0; x-- {
+    i.fromAlbum(sa[x])
   }
   return i
 }
