@@ -35,7 +35,7 @@ func testArtworkFiles(t *testing.T,
     files = append(files, &fsutil.TestFile{k, v})
   }
 
-  dir := fsutil.CreateTestFiles(t, files)
+  dir, _ := fsutil.CreateTestFiles(t, files)
   defer os.RemoveAll(dir)
 
   testFunc(dir)

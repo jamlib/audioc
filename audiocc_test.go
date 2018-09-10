@@ -79,7 +79,7 @@ func createTestProcessFiles(t *testing.T, files []*TestProcessFiles) (*audiocc, 
     createFiles = append(createFiles, &fsutil.TestFile{files[x].path, string(b)})
   }
 
-  a.DirEntry = fsutil.CreateTestFiles(t, createFiles)
+  a.DirEntry, _ = fsutil.CreateTestFiles(t, createFiles)
   return a, indexes
 }
 
