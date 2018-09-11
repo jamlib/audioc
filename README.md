@@ -128,7 +128,7 @@ Including `--write` will apply changes to disk.
 
 ## Developing
 
-[Install Go and Dep](INSTALL_GO_DEP.md).
+[Install Go and Dep](docs/INSTALL_GO_DEP.md).
 
 ### Building
 
@@ -160,7 +160,7 @@ From within source path, run:
 
 ### Contributing
 
-[Submit a Pull Request](SUBMIT_PR.md).
+[Submit a Pull Request](docs/SUBMIT_PR.md).
 
 ## License
 
