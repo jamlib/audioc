@@ -1,4 +1,4 @@
-package main
+package metadata
 
 import (
   "strings"
@@ -9,19 +9,19 @@ import (
 
 func TestToAlbum(t *testing.T) {
   tests := []struct {
-    i *info
+    i *Info
     result string
   }{
-    { i: &info{ Year: "2004", Month: "06", Day: "15", Album: "Somewhere, USA" },
+    { i: &Info{ Year: "2004", Month: "06", Day: "15", Album: "Somewhere, USA" },
       result: "2004.06.15 Somewhere, USA",
     },{
-      i: &info{ Year: "2004", Album: "Great Album" },
+      i: &Info{ Year: "2004", Album: "Great Album" },
       result: "2004 Great Album",
     },
   }
 
   for x := range tests {
-    r := tests[x].i.toAlbum()
+    r := tests[x].i.ToAlbum()
     if r != tests[x].result {
       t.Errorf("Expected %v, got %v", tests[x].result, r)
     }
@@ -30,19 +30,19 @@ func TestToAlbum(t *testing.T) {
 
 func TestToFile(t *testing.T) {
   tests := []struct {
-    i *info
+    i *Info
     result string
   }{
-    { i: &info{ Disc: "", Track: "6", Title: "After Midnight" },
+    { i: &Info{ Disc: "", Track: "6", Title: "After Midnight" },
       result: "6 After Midnight",
     },{
-      i: &info{ Disc: "2", Track: "03", Title: "Russian Lullaby" },
+      i: &Info{ Disc: "2", Track: "03", Title: "Russian Lullaby" },
       result: "2-03 Russian Lullaby",
     },
   }
 
   for x := range tests {
-    r := tests[x].i.toFile()
+    r := tests[x].i.ToFile()
     if r != tests[x].result {
       t.Errorf("Expected %v, got %v", tests[x].result, r)
     }
@@ -51,34 +51,34 @@ func TestToFile(t *testing.T) {
 
 func TestMatchProbeTags(t *testing.T) {
   tests := []struct {
-    info, comb *info
+    info, comb *Info
     tags *ffprobe.Tags
     match bool
   }{
-    { info: &info{ Album: "Kean College After Midnight", Title: "After Midnight" },
+    { info: &Info{ Album: "Kean College After Midnight", Title: "After Midnight" },
       tags: &ffprobe.Tags{ Album: "Something Else" },
-      comb: &info{ Album: "Kean College After Midnight", Title: "After Midnight" },
+      comb: &Info{ Album: "Kean College After Midnight", Title: "After Midnight" },
       match: false,
     },{
-      info: &info{ Album: "Kean College After Midnight", Year: "1980" },
+      info: &Info{ Album: "Kean College After Midnight", Year: "1980" },
       tags: &ffprobe.Tags{ Album: "1980 Kean College After Midnight" },
-      comb: &info{ Album: "Kean College After Midnight", Year: "1980" },
+      comb: &Info{ Album: "Kean College After Midnight", Year: "1980" },
       match: true,
     },{
-      info: &info{ Album: "Kean College After Midnight", Year: "1980" },
+      info: &Info{ Album: "Kean College After Midnight", Year: "1980" },
       tags: &ffprobe.Tags{ Album: "1980.02.28 Kean College After Midnight" },
-      comb: &info{ Album: "Kean College After Midnight", Year: "1980", Month: "02", Day: "28" },
+      comb: &Info{ Album: "Kean College After Midnight", Year: "1980", Month: "02", Day: "28" },
       match: false,
     },{
-      info: &info{ Disc: "1" },
+      info: &Info{ Disc: "1" },
       tags: &ffprobe.Tags{ Disc: "1/2" },
-      comb: &info{ Disc: "1" },
+      comb: &Info{ Disc: "1" },
       match: true,
     },
   }
 
   for x := range tests {
-    rInfo, match := tests[x].info.matchProbeTags(tests[x].tags)
+    rInfo, match := tests[x].info.MatchProbeTags(tests[x].tags)
 
     if *rInfo != *tests[x].comb {
       t.Errorf("Expected %v, got %v", rInfo, tests[x].comb)
@@ -98,7 +98,7 @@ func TestInfoFromFile(t *testing.T) {
   }
 
   for x := range tests {
-    i := &info{}
+    i := &Info{}
     i.fromFile(tests[x][0][0])
     compare := []string{ i.Year, i.Month, i.Day, i.Disc, i.Track, i.Title }
     if strings.Join(compare, "\n") != strings.Join(tests[x][1], "\n") {
@@ -119,7 +119,7 @@ func TestInfoFromPath(t *testing.T) {
   }
 
   for x := range tests {
-    i := &info{}
+    i := &Info{}
     i.fromPath(tests[x][0][0])
     compare := []string{ i.Year, i.Month, i.Day, i.Album }
     if strings.Join(compare, "\n") != strings.Join(tests[x][1], "\n") {
@@ -155,7 +155,7 @@ func TestMatchYearOnly(t *testing.T) {
   }
 
   for x := range tests {
-    i := &info{}
+    i := &Info{}
     remain := i.matchYearOnly(tests[x][0])
     if i.Year != tests[x][1] {
       t.Errorf("Expected %v, got %v", tests[x][1], i.Year)
@@ -187,7 +187,7 @@ func TestMatchDate(t *testing.T) {
   }
 
   for x := range tests {
-    i := &info{}
+    i := &Info{}
     remain := i.matchDate(tests[x][0][0])
     compare := []string{ i.Year, i.Month, i.Day, remain }
     if strings.Join(compare, "\n") != strings.Join(tests[x][1], "\n") {
@@ -227,7 +227,7 @@ func TestMatchDiscTrack(t *testing.T) {
   }
 
   for x := range tests {
-    i := &info{}
+    i := &Info{}
     remain := i.matchDiscTrack(tests[x][0][0])
     compare := []string{ i.Disc, i.Track, remain }
     if strings.Join(compare, "\n") != strings.Join(tests[x][1], "\n") {
@@ -244,7 +244,7 @@ func TestMatchDiscOnly(t *testing.T) {
   }
 
   for x := range tests {
-    i := &info{}
+    i := &Info{}
     i.matchDiscOnly(tests[x][0])
     if i.Disc != tests[x][1] {
       t.Errorf("Expected %v, got %v", tests[x][1], i.Disc)
@@ -264,6 +264,20 @@ func TestMatchAlbumOrTitle(t *testing.T) {
 
   for i := range tests {
     r := matchAlbumOrTitle(tests[i][0])
+    if r != tests[i][1] {
+      t.Errorf("Expected %v, got %v", tests[i][1], r)
+    }
+  }
+}
+
+// TODO update this
+func TestSafeFilename(t *testing.T) {
+  tests := [][]string{
+    { "", "" },
+  }
+
+  for i := range tests {
+    r := safeFilename(tests[i][0])
     if r != tests[i][1] {
       t.Errorf("Expected %v, got %v", tests[i][1], r)
     }

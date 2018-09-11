@@ -1,4 +1,4 @@
-package main
+package metadata
 
 import (
   "fmt"
@@ -12,21 +12,21 @@ import (
 )
 
 // audio file info derived from file path & embedded metadata
-type info struct {
+type Info struct {
   Artist, Album, Year, Month, Day string
   Disc, Track, Title string
 }
 
 // returns info from path
-func newInfo(dir, file string) *info {
-  i := &info{}
+func NewInfo(dir, file string) *Info {
+  i := &Info{}
   i.fromFile(file)
   i.fromPath(dir)
   return i
 }
 
 // returns album prefixed with fulldate, year, or nothing (if no year)
-func (i *info) toAlbum() string {
+func (i *Info) ToAlbum() string {
   if i.Year != "" {
     if i.Month != "" && i.Day != ""{
       return fmt.Sprintf("%s.%s.%s %s", i.Year, i.Month, i.Day, i.Album)
@@ -38,7 +38,7 @@ func (i *info) toAlbum() string {
 
 // returns filename string from Disc, Track, Title (ex: "1-01 Title.mp3")
 // without Disc (ex: "01 Title.mp3")
-func (i *info) toFile() string {
+func (i *Info) ToFile() string {
   var out string
   if len(i.Disc) > 0 {
     out += i.Disc + "-"
@@ -49,9 +49,9 @@ func (i *info) toFile() string {
 
 // compare file path info against ffprobe.Tags and combine into best info
 // return includes boolean if info sources match (no update necessary)
-func (i *info) matchProbeTags(p *ffprobe.Tags) (*info, bool) {
+func (i *Info) MatchProbeTags(p *ffprobe.Tags) (*Info, bool) {
   // build info from ffprobe.Tags
-  tagInfo := &info{
+  tagInfo := &Info{
     Artist: p.Artist,
     // match Disc "1/2" as "1"
     Disc: regexp.MustCompile(`^\d+`).FindString(p.Disc),
@@ -102,7 +102,7 @@ func (i *info) matchProbeTags(p *ffprobe.Tags) (*info, bool) {
 }
 
 // determine Disc, Year, Month, Day, Album from album string
-func (i *info) fromAlbum(s string) {
+func (i *Info) fromAlbum(s string) {
   i.matchDiscOnly(s)
   s = i.matchDate(s)
   s = i.matchYearOnly(s)
@@ -112,7 +112,7 @@ func (i *info) fromAlbum(s string) {
 }
 
 // determine Disc, Year, Month, Day, Track, Title from file string
-func (i *info) fromFile(s string) *info {
+func (i *Info) fromFile(s string) *Info {
   s = i.matchDate(s)
   s = i.matchDiscTrack(s)
   i.Title = matchAlbumOrTitle(s)
@@ -121,7 +121,7 @@ func (i *info) fromFile(s string) *info {
 }
 
 // derive info album info from nested folder path
-func (i *info) fromPath(p string) *info {
+func (i *Info) fromPath(p string) *Info {
   // start inner-most folder, work out
   sa := strings.Split(p, fsutil.PathSep)
   for x := len(sa)-1; x >= 0; x-- {
@@ -161,7 +161,7 @@ func validDate(year, mon, day string) bool {
 }
 
 // if full date not found, try year only
-func (i *info) matchYearOnly(s string) string {
+func (i *Info) matchYearOnly(s string) string {
   m, remain := regexpMatch(s, `^(?P<year>\d{4})\s{1}-*\s*`)
   if len(m) < 2 {
     return s
@@ -173,7 +173,7 @@ func (i *info) matchYearOnly(s string) string {
 }
 
 // irerate through dateRegexps returning first valid date found
-func (i *info) matchDate(s string) string {
+func (i *Info) matchDate(s string) string {
   for index, regExpStr := range dateRegexps {
     m, remain := regexpMatch(s, regExpStr)
     if len(m) == 0 {
@@ -246,7 +246,7 @@ var discTrackRegexps = []string{
   `[sd](?P<disc>\d{1})[-. _t]*(?P<track>\d{1})`,
 }
 
-func (i *info) matchDiscTrack(s string) string {
+func (i *Info) matchDiscTrack(s string) string {
   for _, regExpStr := range discTrackRegexps {
     m, r := regexpMatch(s, regExpStr)
     if len(m) == 0 {
@@ -264,7 +264,7 @@ func (i *info) matchDiscTrack(s string) string {
   return s
 }
 
-func (i *info) matchDiscOnly(s string) {
+func (i *Info) matchDiscOnly(s string) {
   m, _ := regexpMatch(s, `(?i)(cd|disc|set|disk)\s*(?P<disc>\d{1,2})\s*`)
   if len(m) >= 3 && len(i.Disc) == 0 {
     i.Disc = m[2]
@@ -317,4 +317,9 @@ func matchAlbumOrTitle(s string) string {
 // replace whitespaces with one space
 func fixWhitespace(s string) string {
   return strings.TrimSpace(regexp.MustCompile(`\s+`).ReplaceAllString(s, " "))
+}
+
+// strip out characters from filename
+func safeFilename(f string) string {
+  return regexp.MustCompile(`[^A-Za-z0-9-'!?& _()]+`).ReplaceAllString(f, "")
 }
