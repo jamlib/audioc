@@ -17,7 +17,7 @@ import (
 
 type AlbumArt struct {
   TempDir string
-  Fullpath, Fulldir string
+  Fullpath string
   WithParentDir bool
   Source string
   Ffmpeg interface {
@@ -115,11 +115,12 @@ func (a *AlbumArt) fromPath() error {
 
   found := ""
   imgs := []string{}
-  images := fsutil.FilesImage(a.Fulldir)
+  fd := filepath.Dir(a.Fullpath)
+  images := fsutil.FilesImage(fd)
 
   // break if find specific match
   for i := range images {
-    imgs = append(imgs, filepath.Join(a.Fulldir, images[i]))
+    imgs = append(imgs, filepath.Join(fd, images[i]))
     for x := range matches {
       if regexp.MustCompile(matches[x]).MatchString(images[i]) {
         found = imgs[i]
@@ -208,7 +209,7 @@ func (a *AlbumArt) processParentFolderArtwork() (string, error) {
 
 // copy src to folder-orig.jpg if larger
 func (a *AlbumArt) copyAsFolderOrigJpg(src string) error {
-  orig := filepath.Join(a.Fulldir, "folder-orig.jpg")
+  orig := filepath.Join(filepath.Dir(a.Fullpath), "folder-orig.jpg")
   if fsutil.IsLarger(src, orig) {
     err := fsutil.CopyFile(src, orig)
     if err != nil {
@@ -220,7 +221,7 @@ func (a *AlbumArt) copyAsFolderOrigJpg(src string) error {
 
 // update folder.jpg & folder-orig.jpg
 func (a *AlbumArt) copyAsFolderJpg(src string) error {
-  folder := filepath.Join(a.Fulldir, "folder.jpg")
+  folder := filepath.Join(filepath.Dir(a.Fullpath), "folder.jpg")
 
   // skip if src already is folder.jpg
   if src == folder {
