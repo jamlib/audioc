@@ -3,7 +3,6 @@ package main
 import (
   "os"
   "fmt"
-  "regexp"
   "strings"
   "path/filepath"
 
@@ -55,44 +54,34 @@ func checkDir(dir string) (string, error) {
   return dir, nil
 }
 
-// separate dir from fullpath
-func onlyDir(path string) string {
-  path, _ = filepath.Split(path)
-  path = strings.TrimSuffix(path, fsutil.PathSep)
-  return path
-}
-
 // group sorted files by common directory
 func bundleFiles(dir string, files []string, f func(bundle []int) error) error {
-  dirCur := ""
+  var dirCur string
   bundle := []int{}
+
+  // need final dir change
   files = append(files, "")
 
   for x := range files {
-    pi := getPathInfo(dir, files[x])
+    d := filepath.Dir(filepath.Join(dir, files[x]))
 
     if dirCur == "" {
-      dirCur = string(pi.Dir)
+      dirCur = d
     }
 
     // if dir changes or last of all files
-    if pi.Dir != dirCur || x == len(files)-1 {
+    if d != dirCur || x == len(files)-1 {
       err := f(bundle)
       if err != nil {
         return err
       }
 
       bundle = []int{}
-      dirCur = string(pi.Dir)
+      dirCur = d
     }
 
     bundle = append(bundle, x)
   }
 
   return nil
-}
-
-// strip out characters from filename
-func safeFilename(f string) string {
-  return regexp.MustCompile(`[^A-Za-z0-9-'!?& _()]+`).ReplaceAllString(f, "")
 }

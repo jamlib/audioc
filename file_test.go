@@ -7,7 +7,6 @@ import (
   "strconv"
   "testing"
   "io/ioutil"
-  "path/filepath"
 )
 
 func tmpFile(t *testing.T, input string, f func(in *os.File)) {
@@ -91,14 +90,6 @@ func TestCheckDir(t *testing.T) {
   }
 }
 
-func TestOnlyDir(t *testing.T) {
-  path := filepath.Join("one", "two", "three.jpg")
-  r := onlyDir(path)
-  if r != "one/two" {
-    t.Errorf("Expected %v, got %v", "one/two", r)
-  }
-}
-
 func TestBundleFiles(t *testing.T) {
   testFiles := []string{
     "artist1/file1",
@@ -140,19 +131,5 @@ func TestBundleFiles(t *testing.T) {
 
   if err {
     t.Errorf("Expected %v, got %v", bundles, results)
-  }
-}
-
-// TODO update this
-func TestSafeFilename(t *testing.T) {
-  tests := [][]string{
-    { "", "" },
-  }
-
-  for i := range tests {
-    r := safeFilename(tests[i][0])
-    if r != tests[i][1] {
-      t.Errorf("Expected %v, got %v", tests[i][1], r)
-    }
   }
 }
