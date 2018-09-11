@@ -16,6 +16,7 @@ import (
   "github.com/JamTools/goff/ffprobe"
   "github.com/JamTools/goff/fsutil"
   "github.com/JamTools/audiocc/albumart"
+  "github.com/JamTools/audiocc/metadata"
 )
 
 type audiocc struct {
@@ -74,8 +75,7 @@ func skipFast(p string) bool {
   if flags.Fast {
     pa := strings.Split(p, fsutil.PathSep)
     // last folder is album
-    t := &info{}
-    t.fromAlbum(pa[len(pa)-1])
+    t := metadata.NewInfo(pa[len(pa)-1], "")
     if len(t.Year) > 0 && len(t.Album) > 0 {
       return true
     }
@@ -85,11 +85,9 @@ func skipFast(p string) bool {
 
 // process album art once per folder of files
 func (a *audiocc) processArtwork(file string) error {
-  pi := getPathInfo(a.DirEntry, file)
-
   art := &albumart.AlbumArt{ Ffmpeg: a.Ffmpeg, Ffprobe: a.Ffprobe,
     ImgDecode: image.DecodeConfig, WithParentDir: true,
-    Fullpath: pi.Fullpath, Fulldir: pi.Fulldir }
+    Fullpath: filepath.Join(a.DirEntry, file) }
 
   if flags.Write {
     var err error
@@ -146,20 +144,21 @@ func (a *audiocc) process() error {
       return err
     }
 
-    // TODO: threaded error handling
-    path := a.processThreaded(indexes)
-    dir := onlyDir(path)
+    path, err := a.processThreaded(indexes)
+    if err != nil {
+      return err
+    }
 
     // remove workDir
     os.RemoveAll(a.Workdir)
 
     // if not same dir, rename directory to target dir
+    dir := filepath.Dir(path)
     if pi.Fulldir != dir {
       _, err = fsutil.MergeFolder(pi.Fulldir, dir, func (f string) (int, string) {
         // split filename from path
         _, file := filepath.Split(f)
-        i := &info{}
-        i.fromFile(file)
+        i := metadata.NewInfo("", file)
 
         disc, _ := strconv.Atoi(regexp.MustCompile(`^\d+`).FindString(i.Disc))
         track, _ := strconv.Atoi(regexp.MustCompile(`^\d+`).FindString(i.Track))
@@ -191,13 +190,22 @@ func (a *audiocc) process() error {
   return nil
 }
 
-func (a *audiocc) processThreaded(indexes []int) string {
+type ChannelDone struct {
+  dir string
+  err error
+}
+
+func (a *audiocc) processThreaded(indexes []int) (string, error) {
+  var err error
   jobs := make(chan int)
-  done := make(chan string, a.Workers)
+  done := make(chan ChannelDone, a.Workers)
 
   // iterate through files sending them to worker processes
   go func() {
     for x := range indexes {
+      if err != nil {
+        break
+      }
       jobs <- indexes[x]
     }
     close(jobs)
@@ -209,32 +217,33 @@ func (a *audiocc) processThreaded(indexes []int) string {
       var dir string
 
       for job := range jobs {
-        var err error
         dir, err = a.processFile(job)
         if err != nil {
-          fmt.Printf("\nError: %s\n", err.Error())
+          break
         }
       }
 
-      // when jobs channel is closed
-      done <- dir
+      done <- ChannelDone{ dir, err }
     }()
   }
 
   // wait for all workers to finish
-  var saveDir string
+  var cd ChannelDone
   for i := 0; i < a.Workers; i++ {
-    saveDir = <-done
+    cd = <-done
+    if cd.err != nil {
+      return cd.dir, cd.err
+    }
   }
 
-  return saveDir
+  return cd.dir, nil
 }
 
 func (a *audiocc) processFile(index int) (string, error) {
   pi := getPathInfo(a.DirEntry, a.Files[index])
 
   // info from path & filename
-  i := newInfo(pi.Dir, pi.File)
+  i := metadata.NewInfo(pi.Dir, pi.File)
 
   // info from embedded tags within audio file
   d, err := a.Ffprobe.GetData(pi.Fullpath)
@@ -251,7 +260,7 @@ func (a *audiocc) processFile(index int) (string, error) {
   }
 
   // combine info w/ embedded tags
-  i, match := i.matchProbeTags(d.Format.Tags)
+  i, match := i.MatchProbeTags(d.Format.Tags)
 
   // skip if sources match (unless --force)
   if match && !flags.Force {
@@ -278,7 +287,7 @@ func (a *audiocc) processFile(index int) (string, error) {
   }
 
   // append directory generated from info
-  path = filepath.Join(path, i.toAlbum())
+  path = filepath.Join(path, i.ToAlbum())
 
   // print changes to be made
   p := fmt.Sprintf("%v\n", pi.Fullpath)
@@ -287,9 +296,10 @@ func (a *audiocc) processFile(index int) (string, error) {
   }
 
   // convert audio (if necessary) & update tags
-  if pi.Ext != ".flac" || regexp.MustCompile(` - FLAC$`).FindString(pi.Dir) == "" {
+  ext := strings.ToLower(filepath.Ext(pi.Fullpath))
+  if ext != ".flac" || regexp.MustCompile(` - FLAC$`).FindString(pi.Dir) == "" {
     // convert to mp3 except flac files with " - FLAC" in folder name
-    f, err := a.processMp3(pi, i)
+    f, err := a.processMp3(pi.Fullpath, i)
     if err != nil {
       return pi.Fullpath, err
     }
@@ -312,24 +322,24 @@ func (a *audiocc) processFile(index int) (string, error) {
   return path, nil
 }
 
-func (a *audiocc) processMp3(pi *pathInfo, i *info) (string, error) {
+func (a *audiocc) processMp3(f string, i *metadata.Info) (string, error) {
   // if already mp3, copy stream; do not convert
   quality := flags.Bitrate
-  if pi.Ext == ".mp3" {
+  if strings.ToLower(filepath.Ext(f)) == ".mp3" {
     quality = "copy"
   }
 
   // TODO: specify lower bitrate if source file is of low bitrate
 
   // build metadata from tag info
-  ffmeta := ffmpeg.Metadata{ Artist: i.Artist, Album: i.toAlbum(),
+  ffmeta := ffmpeg.Metadata{ Artist: i.Artist, Album: i.ToAlbum(),
     Disc: i.Disc, Track: i.Track, Title: i.Title, Artwork: a.Image }
 
   // save new file to Workdir subdir within current path
-  newFile := filepath.Join(a.Workdir, i.toFile() + ".mp3")
+  newFile := filepath.Join(a.Workdir, i.ToFile() + ".mp3")
 
   // process or convert to mp3
-  c := &ffmpeg.Mp3Config{ pi.Fullpath, quality, newFile, ffmeta, flags.Fix }
+  c := &ffmpeg.Mp3Config{ f, quality, newFile, ffmeta, flags.Fix }
   _, err := a.Ffmpeg.ToMp3(c)
   if err != nil {
     return newFile, err
@@ -344,11 +354,11 @@ func (a *audiocc) processMp3(pi *pathInfo, i *info) (string, error) {
   // if flagsWrite & resulting file has size
   // TODO: ensure resulting file is good by reading & comparing metadata
   if fi.Size() > 0 {
-    file := filepath.Join(pi.Fulldir, i.toFile() + ".mp3")
+    file := filepath.Join(filepath.Dir(f), i.ToFile() + ".mp3")
 
     if flags.Write {
       // delete original
-      err = os.Remove(pi.Fullpath)
+      err = os.Remove(f)
       if err != nil {
         return file, err
       }

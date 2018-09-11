@@ -46,7 +46,7 @@ func TestSkipFast(t *testing.T) {
   for i := range tests {
     r := skipFast(tests[i].dir)
     if r != tests[i].skip {
-      t.Errorf("Expected %v, got %v", tests[i].skip, r)
+      t.Errorf("Expected %v, got %v for %v", tests[i].skip, r, tests[i].dir)
     }
   }
 }
