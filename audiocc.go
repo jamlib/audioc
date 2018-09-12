@@ -83,6 +83,14 @@ func skipFast(p string) bool {
   return false
 }
 
+// combines skipFast & skipArtistOnCollection
+func skipFolder(p string) bool {
+  if skipArtistOnCollection(p) || skipFast(p) {
+    return true
+  }
+  return false
+}
+
 // process album art once per folder of files
 func (a *audiocc) processArtwork(file string) error {
   art := &albumart.AlbumArt{ Ffmpeg: a.Ffmpeg, Ffprobe: a.Ffprobe,
@@ -91,13 +99,6 @@ func (a *audiocc) processArtwork(file string) error {
 
   if flags.Write {
     var err error
-
-    // probe to determine if has embedded artwork
-    _, err = a.Ffprobe.GetData(art.Fullpath)
-    if err != nil {
-      return err
-    }
-
     a.Image, err = albumart.Process(art)
     if err != nil {
       return err
@@ -113,9 +114,9 @@ func (a *audiocc) process() error {
   }
 
   // ensure path is is valid directory
-  _, err := checkDir(a.DirEntry)
-  if err != nil {
-    return err
+  fi, err := os.Stat(a.DirEntry)
+  if err != nil || !fi.IsDir() {
+    return fmt.Errorf("Invalid directory: %s", a.DirEntry)
   }
 
   // obtain audio file list
@@ -123,55 +124,45 @@ func (a *audiocc) process() error {
 
   // group files by parent directory
   err = bundleFiles(a.DirEntry, a.Files, func(indexes []int) error {
-    pi := getPathInfo(a.DirEntry, a.Files[indexes[0]])
+    file := a.Files[indexes[0]]
+    fullDir := filepath.Dir(filepath.Join(a.DirEntry, file))
 
     // skip if possible
-    if skipArtistOnCollection(pi.Dir) || skipFast(pi.Dir) {
+    if skipFolder(file) {
       return nil
     }
 
-    fmt.Printf("\nProcessing: %v ...\n", pi.Fulldir)
+    fmt.Printf("\nProcessing: %v ...\n", fullDir)
 
     // process artwork once per folder
-    err = a.processArtwork(a.Files[indexes[0]])
+    err = a.processArtwork(file)
     if err != nil {
       return err
     }
 
     // create new random workdir within current path
-    a.Workdir, err = ioutil.TempDir(pi.Fulldir, "")
+    a.Workdir, err = ioutil.TempDir(fullDir, "")
     if err != nil {
       return err
     }
+    defer os.RemoveAll(a.Workdir)
 
-    path, err := a.processThreaded(indexes)
+    // process folder via threads returning the resulting dir
+    dir, err := a.processThreaded(indexes)
     if err != nil {
       return err
     }
-
-    // remove workDir
-    os.RemoveAll(a.Workdir)
 
     // if not same dir, rename directory to target dir
-    dir := filepath.Dir(path)
-    if pi.Fulldir != dir {
-      _, err = fsutil.MergeFolder(pi.Fulldir, dir, func (f string) (int, string) {
-        // split filename from path
-        _, file := filepath.Split(f)
-        i := metadata.NewInfo("", file)
-
-        disc, _ := strconv.Atoi(regexp.MustCompile(`^\d+`).FindString(i.Disc))
-        track, _ := strconv.Atoi(regexp.MustCompile(`^\d+`).FindString(i.Track))
-
-        return (disc*1000)+track, i.Title
-      })
+    if fullDir != dir {
+      _, err = fsutil.MergeFolder(fullDir, dir, mergeFolderFunc)
       if err != nil {
         return err
       }
     }
 
     // remove parent folder if no longer contains audio files
-    parentDir := filepath.Dir(pi.Fulldir)
+    parentDir := filepath.Dir(fullDir)
     if len(fsutil.FilesAudio(parentDir)) == 0 {
       err = os.RemoveAll(parentDir)
       if err != nil {
@@ -190,15 +181,25 @@ func (a *audiocc) process() error {
   return nil
 }
 
-type ChannelDone struct {
-  dir string
-  err error
+// passed to fsutil.MergeFolder
+func mergeFolderFunc(f string) (int, string) {
+  // split filename from path
+  _, file := filepath.Split(f)
+
+  // parse disc & track from filename
+  i := metadata.NewInfo("", file)
+
+  disc, _ := strconv.Atoi(regexp.MustCompile(`^\d+`).FindString(i.Disc))
+  track, _ := strconv.Atoi(regexp.MustCompile(`^\d+`).FindString(i.Track))
+
+  // combine disc & track into unique integer
+  return (disc*1000)+track, i.Title
 }
 
 func (a *audiocc) processThreaded(indexes []int) (string, error) {
   var err error
   jobs := make(chan int)
-  done := make(chan ChannelDone, a.Workers)
+  dir := make(chan string, a.Workers)
 
   // iterate through files sending them to worker processes
   go func() {
@@ -214,29 +215,26 @@ func (a *audiocc) processThreaded(indexes []int) (string, error) {
   // start worker processes
   for i := 0; i < a.Workers; i++ {
     go func() {
-      var dir string
+      var d string
 
       for job := range jobs {
-        dir, err = a.processFile(job)
+        d, err = a.processFile(job)
         if err != nil {
           break
         }
       }
 
-      done <- ChannelDone{ dir, err }
+      dir <- d
     }()
   }
 
   // wait for all workers to finish
-  var cd ChannelDone
+  var resultDir string
   for i := 0; i < a.Workers; i++ {
-    cd = <-done
-    if cd.err != nil {
-      return cd.dir, cd.err
-    }
+    resultDir = <-dir
   }
 
-  return cd.dir, nil
+  return resultDir, err
 }
 
 func (a *audiocc) processFile(index int) (string, error) {
@@ -248,7 +246,7 @@ func (a *audiocc) processFile(index int) (string, error) {
   // info from embedded tags within audio file
   d, err := a.Ffprobe.GetData(pi.Fullpath)
   if err != nil {
-    return pi.Fullpath, err
+    return pi.Fulldir, err
   }
 
   // set artist
@@ -264,7 +262,7 @@ func (a *audiocc) processFile(index int) (string, error) {
 
   // skip if sources match (unless --force)
   if match && !flags.Force {
-    return pi.Fullpath, nil
+    return pi.Fulldir, nil
   }
 
   // override artist for consistency
@@ -301,15 +299,15 @@ func (a *audiocc) processFile(index int) (string, error) {
     // convert to mp3 except flac files with " - FLAC" in folder name
     f, err := a.processMp3(pi.Fullpath, i)
     if err != nil {
-      return pi.Fullpath, err
+      return pi.Fulldir, err
     }
 
     // add filename to returning path
     _, file := filepath.Split(f)
-    path = filepath.Join(path, file)
+    newPath := filepath.Join(path, file)
 
-    if pi.Fullpath != path {
-      p += fmt.Sprintf("  * rename to: %v\n", path)
+    if pi.Fullpath != newPath {
+      p += fmt.Sprintf("  * rename to: %v\n", newPath)
     }
   } else {
     // TODO: use metaflac to edit flac metadata & embedd artwork
@@ -319,6 +317,7 @@ func (a *audiocc) processFile(index int) (string, error) {
   // print to console all at once
   fmt.Printf(p)
 
+  // path is a directory
   return path, nil
 }
 
