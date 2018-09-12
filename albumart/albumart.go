@@ -12,6 +12,7 @@ import (
   _ "image/jpeg"
   _ "image/png"
 
+  "github.com/JamTools/goff/ffprobe"
   "github.com/JamTools/goff/fsutil"
 )
 
@@ -26,6 +27,7 @@ type AlbumArt struct {
   }
   Ffprobe interface {
     EmbeddedImage() (int, int, bool)
+    GetData(filePath string) (*ffprobe.Data, error)
   }
   ImgDecode func (r io.Reader) (image.Config, string, error)
 }
@@ -39,6 +41,17 @@ func Process(a *AlbumArt) (string, error) {
   }
   defer os.RemoveAll(td)
   a.TempDir = td
+
+  // TODO: if folder.jpg, use (do not compress) as is (skip embedded)
+
+  // probe to determine if has embedded artwork
+  _, err = os.Stat(a.Fullpath)
+  if err == nil {
+    _, err = a.Ffprobe.GetData(a.Fullpath)
+    if err != nil {
+      return "", err
+    }
+  }
 
   // if file has embedded artwork, extract & optimize
   w, h, has := a.Ffprobe.EmbeddedImage()
