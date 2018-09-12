@@ -1,8 +1,6 @@
 package main
 
 import (
-  "os"
-  "fmt"
   "strings"
   "path/filepath"
 
@@ -17,12 +15,12 @@ type pathInfo struct {
 // split full path into pieces used to determine info
 func getPathInfo(basePath, filePath string) *pathInfo {
   basePath = filepath.Clean(basePath)
-  pi := &pathInfo{Fullpath: filepath.Join(basePath, filePath) }
+  pi := &pathInfo{ Fullpath: filepath.Join(basePath, filePath) }
 
   pi.Fulldir, pi.File = filepath.Split(pi.Fullpath)
   pi.Fulldir = filepath.Clean(pi.Fulldir)
-  pi.Ext = filepath.Ext(pi.File)
 
+  pi.Ext = filepath.Ext(pi.File)
   pi.File = strings.TrimSuffix(pi.File, pi.Ext)
   pi.Ext = strings.ToLower(pi.Ext)
 
@@ -40,18 +38,6 @@ func getPathInfo(basePath, filePath string) *pathInfo {
   }
 
   return pi
-}
-
-func checkDir(dir string) (string, error) {
-  dir = filepath.Clean(dir)
-  fi, err := os.Stat(dir)
-  if err != nil {
-    return dir, err
-  }
-  if !fi.IsDir() {
-    return dir, fmt.Errorf("Not a directory")
-  }
-  return dir, nil
 }
 
 // group sorted files by common directory

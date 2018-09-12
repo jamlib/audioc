@@ -61,35 +61,6 @@ func TestPathInfo(t *testing.T) {
   }
 }
 
-func TestCheckDirInvalid(t *testing.T) {
-  // not exist
-  _, err := checkDir("audiocc-path-def-dne")
-  if err == nil {
-    t.Errorf("Expected error, got nil")
-  }
-
-  // not directory
-  tmpFile(t, "", func(in *os.File){
-    _, err := checkDir(in.Name())
-    if err == nil {
-      t.Errorf("Expected error, got nil")
-    }
-  })
-}
-
-func TestCheckDir(t *testing.T) {
-  td, err := ioutil.TempDir("", "")
-  if err != nil {
-    t.Fatal(err)
-  }
-  defer os.RemoveAll(td)
-
-  _, err = checkDir(td)
-  if err != nil {
-    t.Errorf("Expected nil, got %v", err)
-  }
-}
-
 func TestBundleFiles(t *testing.T) {
   testFiles := []string{
     "artist1/file1",
