@@ -69,7 +69,7 @@ func TestArtworkProcess(t *testing.T) {
         Ffprobe: &ffprobe.MockFfprobe{ Width: tests[i].width, Embedded: tests[i].embedded } }
 
       testArtworkFiles(t, tests[i].files, func(dir string) {
-        a.Fullpath = filepath.Join(dir, "folder.jpg")
+        a.Fullpath = filepath.Join(dir, "1-1 Title.mp3")
 
         _, err := Process(a)
         if err != nil {
@@ -108,7 +108,7 @@ func TestArtworkEmbedded(t *testing.T) {
       a := &AlbumArt{ Ffmpeg: &ffmpeg.MockFfmpeg{ Embedded: tests[i].embedded }, TempDir: td }
 
       testArtworkFiles(t, tests[i].files, func(dir string) {
-        a.Fullpath = filepath.Join(dir, "folder.jpg")
+        a.Fullpath = filepath.Join(dir, "1-1 Title.mp3")
 
         err := a.embedded(tests[i].width, 1)
         if err != nil {
@@ -153,7 +153,7 @@ func TestArtworkFromPath(t *testing.T) {
       a := &AlbumArt{ Ffmpeg: &ffmpeg.MockFfmpeg{}, TempDir: td, ImgDecode: imageDecode }
 
       testArtworkFiles(t, tests[i].files, func(dir string) {
-        a.Fullpath = filepath.Join(dir, "folder.jpg")
+        a.Fullpath = filepath.Join(dir, "1-1 Title.mp3")
 
         err := a.fromPath()
         if err != nil {
@@ -198,7 +198,7 @@ func TestArtworkCopyAsFolderJpg(t *testing.T) {
 
       for i := range tests {
         testArtworkFiles(t, tests[i].files, func(dir2 string) {
-          a := &AlbumArt{ Fullpath: filepath.Join(dir2, "folder.jpg") }
+          a := &AlbumArt{ Fullpath: filepath.Join(dir2, "1-1 Title.mp3") }
 
           err := a.copyAsFolderJpg(filepath.Join(dir, tests[i].key))
           if err != nil {
