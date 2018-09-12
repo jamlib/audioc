@@ -6,15 +6,67 @@ import (
   "regexp"
   "strconv"
   "strings"
+  "path/filepath"
 
   "github.com/JamTools/goff/ffprobe"
   "github.com/JamTools/goff/fsutil"
 )
 
+type Metadata struct {
+  Artist string
+  Basepath string
+  Fullpath string
+  Fulldir string
+  Infodir string
+  Match bool
+  Ffprobe interface {
+    GetData(filePath string) (*ffprobe.Data, error)
+  }
+}
+
 // audio file info derived from file path & embedded metadata
 type Info struct {
   Artist, Album, Year, Month, Day string
   Disc, Track, Title string
+}
+
+func New(m *Metadata) (*Metadata, *Info, error) {
+  i := &Info{}
+  m.Fulldir = filepath.Dir(m.Fullpath)
+
+  // info from infodir
+  m.Infodir = strings.TrimPrefix(m.Fulldir, m.Basepath)
+  m.Infodir = strings.TrimPrefix(m.Infodir, fsutil.PathSep)
+  if m.Infodir == "" {
+    // use innermost dir of fullpath
+    m.Infodir = filepath.Base(m.Fulldir)
+  }
+  i.fromPath(m.Infodir)
+
+  // info from file name
+  _, file := filepath.Split(m.Fullpath)
+  file = strings.TrimSuffix(file, filepath.Ext(file))
+  i.fromFile(file)
+
+  // info from embedded tags within audio file
+  d, err := m.Ffprobe.GetData(m.Fullpath)
+  if err != nil {
+    return m, i, err
+  }
+
+  // choose best artist
+  if i.Artist == "" {
+    if m.Artist != "" {
+      i.Artist = m.Artist
+    } else {
+      i.Artist = d.Format.Tags.Artist
+    }
+  }
+
+  // combine info w/ embedded tags
+  i, m.Match = i.MatchProbeTags(d.Format.Tags)
+
+  return m, i, nil
 }
 
 // returns info from path
