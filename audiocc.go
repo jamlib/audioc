@@ -123,7 +123,7 @@ func (a *audiocc) process() error {
   a.Files = fsutil.FilesAudio(a.DirEntry)
 
   // group files by parent directory
-  err = bundleFiles(a.DirEntry, a.Files, func(indexes []int) error {
+  err = fsutil.BundleFiles(a.DirEntry, a.Files, func(indexes []int) error {
     file := a.Files[indexes[0]]
     fullDir := filepath.Dir(filepath.Join(a.DirEntry, file))
 
@@ -238,40 +238,31 @@ func (a *audiocc) processThreaded(indexes []int) (string, error) {
 }
 
 func (a *audiocc) processFile(index int) (string, error) {
-  pi := getPathInfo(a.DirEntry, a.Files[index])
-
-  // info from path & filename
-  i := metadata.NewInfo(pi.Dir, pi.File)
-
-  // info from embedded tags within audio file
-  d, err := a.Ffprobe.GetData(pi.Fullpath)
-  if err != nil {
-    return pi.Fulldir, err
+  m := &metadata.Metadata{
+    Basepath: a.DirEntry,
+    Fullpath: filepath.Join(a.DirEntry, a.Files[index]),
+    Ffprobe: a.Ffprobe,
   }
 
-  // set artist
+  // if --artist mode, remove innermost dir from basepath so it ends up in infopath
   if flags.Artist != "" {
-    i.Artist = flags.Artist
-  }
-  if i.Artist == "" {
-    i.Artist = d.Format.Tags.Artist
+    m.Artist = flags.Artist
+    m.Basepath = filepath.Dir(m.Basepath)
   }
 
-  // combine info w/ embedded tags
-  i, match := i.MatchProbeTags(d.Format.Tags)
+  // if --colleciton mode, artist comes from parent folder name
+  if flags.Collection {
+    m.Artist = strings.Split(a.Files[index], fsutil.PathSep)[0]
+  }
+
+  m, i, err := metadata.New(m)
+  if err != nil {
+    return "", err
+  }
 
   // skip if sources match (unless --force)
-  if match && !flags.Force {
-    return pi.Fulldir, nil
-  }
-
-  // override artist for consistency
-  if len(flags.Artist) > 0 {
-    // force artist which was specified
-    i.Artist = flags.Artist
-  } else if flags.Collection {
-    // artist comes from parent folder name
-    i.Artist = strings.Split(pi.Dir, fsutil.PathSep)[0]
+  if m.Match && !flags.Force {
+    return m.Fulldir, nil
   }
 
   // build resulting path
@@ -281,32 +272,32 @@ func (a *audiocc) processFile(index int) (string, error) {
     path = filepath.Join(a.DirEntry, i.Artist, i.Year)
   } else {
     // remove current dir from fullpath
-    path = strings.TrimSuffix(pi.Fulldir, pi.Dir)
+    path = strings.TrimSuffix(m.Fulldir, m.Infodir)
   }
 
   // append directory generated from info
   path = filepath.Join(path, i.ToAlbum())
 
   // print changes to be made
-  p := fmt.Sprintf("%v\n", pi.Fullpath)
-  if !match {
+  p := fmt.Sprintf("%v\n", m.Fullpath)
+  if !m.Match {
     p += fmt.Sprintf("  * update tags: %#v\n", i)
   }
 
   // convert audio (if necessary) & update tags
-  ext := strings.ToLower(filepath.Ext(pi.Fullpath))
-  if ext != ".flac" || regexp.MustCompile(` - FLAC$`).FindString(pi.Dir) == "" {
+  ext := strings.ToLower(filepath.Ext(m.Fullpath))
+  if ext != ".flac" || regexp.MustCompile(` - FLAC$`).FindString(m.Infodir) == "" {
     // convert to mp3 except flac files with " - FLAC" in folder name
-    f, err := a.processMp3(pi.Fullpath, i)
+    f, err := a.processMp3(m.Fullpath, i)
     if err != nil {
-      return pi.Fulldir, err
+      return "", err
     }
 
     // add filename to returning path
     _, file := filepath.Split(f)
     newPath := filepath.Join(path, file)
 
-    if pi.Fullpath != newPath {
+    if m.Fullpath != newPath {
       p += fmt.Sprintf("  * rename to: %v\n", newPath)
     }
   } else {

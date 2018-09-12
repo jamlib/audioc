@@ -9,7 +9,7 @@
     "ffprobe",
     "fsutil"
   ]
-  revision = "73816ff06d76222837be8cc93369328483214f1e"
+  revision = "1a879854921cbb2b613ef3d490aab84404280b39"
 
 [solve-meta]
   analyzer-name = "dep"
