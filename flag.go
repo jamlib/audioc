@@ -35,9 +35,6 @@ Options:
     320
       convert to constant 320kbps mp3
 
-  --fast
-    skips album directory if starts w/ year
-
   --fix
     fixes incorrect track length, ie 1035:36:51
 
@@ -54,7 +51,7 @@ Debug:
 
 type Flags struct {
   Artist, Bitrate string
-  Collection, Fast, Fix, Force, Version, Write bool
+  Collection, Fix, Force, Version, Write bool
 }
 
 var flags = Flags{}
@@ -65,7 +62,6 @@ func init() {
   flag.BoolVar(&flags.Collection, "collection", false, "")
   // setup options
   flag.StringVar(&flags.Bitrate, "bitrate", "V0", "")
-  flag.BoolVar(&flags.Fast, "fast", false, "")
   flag.BoolVar(&flags.Fix, "fix", false, "")
   flag.BoolVar(&flags.Force, "force", false, "")
   flag.BoolVar(&flags.Write, "write", false, "")

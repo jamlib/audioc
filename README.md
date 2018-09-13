@@ -24,9 +24,6 @@ Options:
     320
       convert to constant 320kbps mp3
 
-  --fast
-    skips album directory if starts w/ year
-
   --fix
     fixes incorrect track length, ie 1035:36:51
 
@@ -105,10 +102,6 @@ Convert other audio formats to MP3 using `libmp3lame` encoding and either V0 (va
 (constant 320kbps) bitrate.
 
 To skip converting FLAC audio, include ` - FLAC` at the end of the album folder name.
-
-### Fast (--fast)
-
-Skips album folder if starts with year without touching any of the individual audio files.
 
 ### Fix (--fix)
 
