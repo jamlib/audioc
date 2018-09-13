@@ -19,9 +19,10 @@ type Metadata struct {
   Fulldir string
   Infodir string
   Match bool
-  Ffprobe interface {
-    GetData(filePath string) (*ffprobe.Data, error)
-  }
+}
+
+type Ffprober interface {
+  GetData(filePath string) (*ffprobe.Data, error)
 }
 
 // audio file info derived from file path & embedded metadata
@@ -30,26 +31,34 @@ type Info struct {
   Disc, Track, Title string
 }
 
-func New(m *Metadata) (*Metadata, *Info, error) {
-  i := &Info{}
+func New(base, path string) *Metadata {
+  m := &Metadata{
+    Basepath: base,
+    Fullpath: filepath.Join(base, path),
+  }
   m.Fulldir = filepath.Dir(m.Fullpath)
 
-  // info from infodir
   m.Infodir = strings.TrimPrefix(m.Fulldir, m.Basepath)
   m.Infodir = strings.TrimPrefix(m.Infodir, fsutil.PathSep)
   if m.Infodir == "" {
     // use innermost dir of fullpath
     m.Infodir = filepath.Base(m.Fulldir)
   }
-  i.fromPath(m.Infodir)
+
+  return m
+}
+
+func (m *Metadata) NewInfo(ffp Ffprober) (*Metadata, *Info, error) {
+  i := &Info{}
+  i.FromPath(m.Infodir)
 
   // info from file name
   _, file := filepath.Split(m.Fullpath)
   file = strings.TrimSuffix(file, filepath.Ext(file))
-  i.fromFile(file)
+  i.FromFile(file)
 
   // info from embedded tags within audio file
-  d, err := m.Ffprobe.GetData(m.Fullpath)
+  d, err := ffp.GetData(m.Fullpath)
   if err != nil {
     return m, i, err
   }
@@ -67,14 +76,6 @@ func New(m *Metadata) (*Metadata, *Info, error) {
   i, m.Match = i.MatchProbeTags(d.Format.Tags)
 
   return m, i, nil
-}
-
-// returns info from path
-func NewInfo(dir, file string) *Info {
-  i := &Info{}
-  i.fromFile(file)
-  i.fromPath(dir)
-  return i
 }
 
 // returns album prefixed with fulldate, year, or nothing (if no year)
@@ -164,7 +165,7 @@ func (i *Info) fromAlbum(s string) {
 }
 
 // determine Disc, Year, Month, Day, Track, Title from file string
-func (i *Info) fromFile(s string) *Info {
+func (i *Info) FromFile(s string) *Info {
   s = i.matchDate(s)
   s = i.matchDiscTrack(s)
   i.Title = matchAlbumOrTitle(s)
@@ -173,7 +174,7 @@ func (i *Info) fromFile(s string) *Info {
 }
 
 // derive info album info from nested folder path
-func (i *Info) fromPath(p string) *Info {
+func (i *Info) FromPath(p string) *Info {
   // start inner-most folder, work out
   sa := strings.Split(p, fsutil.PathSep)
   for x := len(sa)-1; x >= 0; x-- {
