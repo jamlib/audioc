@@ -45,11 +45,7 @@ func main() {
     log.Fatal(err)
   }
 
-  // process files using multiple cores
-  var workers = runtime.NumCPU()
-  //workers = 1 // DEBUG in single-threaded mode
-
-  a := &audiocc{ Ffmpeg: ffm, Ffprobe: ffp, Workers: workers,
+  a := &audiocc{ Ffmpeg: ffm, Ffprobe: ffp, Workers: runtime.NumCPU(),
     DirEntry: filepath.Clean(args[0]) }
 
   err = a.process()
@@ -58,36 +54,35 @@ func main() {
   }
 }
 
-// true if --collection & artist path contains " - "
-func skipArtistOnCollection(p string) bool {
+func skipFolder(base, path string) bool {
+  var alb string
+  m := metadata.New(base, path)
+  pa := strings.Split(m.Infodir, fsutil.PathSep)
+
   if flags.Collection {
-    pa := strings.Split(p, fsutil.PathSep)
-    // first folder is artist
+    // true if --collection & artist path contains " - "
     if strings.Index(pa[0], " - ") != -1 {
       return true
     }
+    if len(pa) > 2 {
+      // Artist / Year / Album
+      alb = pa[2]
+    }
+  } else {
+    // if --artist, album should be innermost dir
+    alb = pa[len(pa)-1]
   }
-  return false
-}
 
-// skip if album folder name contains year (--fast)
-func skipFast(p string) bool {
-  if flags.Fast {
-    pa := strings.Split(p, fsutil.PathSep)
-    // last folder is album
-    t := metadata.NewInfo(pa[len(pa)-1], "")
-    if len(t.Year) > 0 && len(t.Album) > 0 {
+  // true if album folder matches metadata.ToAlbum
+  if alb != "" {
+    i := &metadata.Info{}
+    i.FromPath(alb)
+
+    if i.ToAlbum() == alb {
       return true
     }
   }
-  return false
-}
 
-// combines skipFast & skipArtistOnCollection
-func skipFolder(p string) bool {
-  if skipArtistOnCollection(p) || skipFast(p) {
-    return true
-  }
   return false
 }
 
@@ -123,61 +118,61 @@ func (a *audiocc) process() error {
   a.Files = fsutil.FilesAudio(a.DirEntry)
 
   // group files by parent directory
-  err = fsutil.BundleFiles(a.DirEntry, a.Files, func(indexes []int) error {
-    file := a.Files[indexes[0]]
-    fullDir := filepath.Dir(filepath.Join(a.DirEntry, file))
-
-    // skip if possible
-    if skipFolder(file) {
-      return nil
-    }
-
-    fmt.Printf("\nProcessing: %v ...\n", fullDir)
-
-    // process artwork once per folder
-    err = a.processArtwork(file)
-    if err != nil {
-      return err
-    }
-
-    // create new random workdir within current path
-    a.Workdir, err = ioutil.TempDir(fullDir, "")
-    if err != nil {
-      return err
-    }
-    defer os.RemoveAll(a.Workdir)
-
-    // process folder via threads returning the resulting dir
-    dir, err := a.processThreaded(indexes)
-    if err != nil {
-      return err
-    }
-
-    // if not same dir, rename directory to target dir
-    if fullDir != dir {
-      _, err = fsutil.MergeFolder(fullDir, dir, mergeFolderFunc)
-      if err != nil {
-        return err
-      }
-    }
-
-    // remove parent folder if no longer contains audio files
-    parentDir := filepath.Dir(fullDir)
-    if len(fsutil.FilesAudio(parentDir)) == 0 {
-      err = os.RemoveAll(parentDir)
-      if err != nil {
-        return err
-      }
-    }
-
-    return nil
-  })
-
+  err = fsutil.BundleFiles(a.DirEntry, a.Files, a.processFolder)
   if err != nil {
     return err
   }
 
   fmt.Printf("\naudiocc finished.\n")
+  return nil
+}
+
+func (a *audiocc) processFolder(indexes []int) error {
+  fullDir := filepath.Dir(filepath.Join(a.DirEntry, a.Files[indexes[0]]))
+
+  // skip if possible (unless --force)
+  if !flags.Force && skipFolder(a.DirEntry, a.Files[indexes[0]]) {
+    return nil
+  }
+
+  fmt.Printf("\nProcessing: %v ...\n", fullDir)
+
+  // process artwork once per folder
+  err := a.processArtwork(a.Files[indexes[0]])
+  if err != nil {
+    return err
+  }
+
+  // create new random workdir within current path
+  a.Workdir, err = ioutil.TempDir(fullDir, "")
+  if err != nil {
+    return err
+  }
+  defer os.RemoveAll(a.Workdir)
+
+  // process folder via threads returning the resulting dir
+  dir, err := a.processThreaded(indexes)
+  if err != nil {
+    return err
+  }
+
+  // if not same dir, rename directory to target dir
+  if fullDir != dir {
+    _, err = fsutil.MergeFolder(fullDir, dir, mergeFolderFunc)
+    if err != nil {
+      return err
+    }
+  }
+
+  // remove parent folder if no longer contains audio files
+  parentDir := filepath.Dir(fullDir)
+  if len(fsutil.FilesAudio(parentDir)) == 0 {
+    err = os.RemoveAll(parentDir)
+    if err != nil {
+      return err
+    }
+  }
+
   return nil
 }
 
@@ -187,7 +182,8 @@ func mergeFolderFunc(f string) (int, string) {
   _, file := filepath.Split(f)
 
   // parse disc & track from filename
-  i := metadata.NewInfo("", file)
+  i := &metadata.Info{}
+  i.FromFile(file)
 
   disc, _ := strconv.Atoi(regexp.MustCompile(`^\d+`).FindString(i.Disc))
   track, _ := strconv.Atoi(regexp.MustCompile(`^\d+`).FindString(i.Track))
@@ -218,8 +214,10 @@ func (a *audiocc) processThreaded(indexes []int) (string, error) {
       var d string
 
       for job := range jobs {
-        d, err = a.processFile(job)
-        if err != nil {
+        var e error
+        d, e = a.processFile(job)
+        if e != nil {
+          err = e
           break
         }
       }
@@ -238,13 +236,9 @@ func (a *audiocc) processThreaded(indexes []int) (string, error) {
 }
 
 func (a *audiocc) processFile(index int) (string, error) {
-  m := &metadata.Metadata{
-    Basepath: a.DirEntry,
-    Fullpath: filepath.Join(a.DirEntry, a.Files[index]),
-    Ffprobe: a.Ffprobe,
-  }
+  m := metadata.New(a.DirEntry, a.Files[index])
 
-  // if --artist mode, remove innermost dir from basepath so it ends up in infopath
+  // if --artist mode, remove innermost dir from basepath so it ends up in infodir
   if flags.Artist != "" {
     m.Artist = flags.Artist
     m.Basepath = filepath.Dir(m.Basepath)
@@ -255,7 +249,7 @@ func (a *audiocc) processFile(index int) (string, error) {
     m.Artist = strings.Split(a.Files[index], fsutil.PathSep)[0]
   }
 
-  m, i, err := metadata.New(m)
+  m, i, err := m.NewInfo(a.Ffprobe)
   if err != nil {
     return "", err
   }
@@ -288,15 +282,13 @@ func (a *audiocc) processFile(index int) (string, error) {
   ext := strings.ToLower(filepath.Ext(m.Fullpath))
   if ext != ".flac" || regexp.MustCompile(` - FLAC$`).FindString(m.Infodir) == "" {
     // convert to mp3 except flac files with " - FLAC" in folder name
-    f, err := a.processMp3(m.Fullpath, i)
+    _, err := a.processMp3(m.Fullpath, i)
     if err != nil {
       return "", err
     }
 
-    // add filename to returning path
-    _, file := filepath.Split(f)
-    newPath := filepath.Join(path, file)
-
+    // compare processed to current path
+    newPath := filepath.Join(path, i.ToFile() + ".mp3")
     if m.Fullpath != newPath {
       p += fmt.Sprintf("  * rename to: %v\n", newPath)
     }
