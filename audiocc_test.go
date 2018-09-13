@@ -12,41 +12,41 @@ import (
 
 func TestSkipArtistOnCollection(t *testing.T) {
   tests := []struct {
-    dir string
+    base, path string
     col, skip bool
   }{
-    { dir: "Jerry Garcia Band", col: true, skip: false },
-    { dir: "Grateful Dead - Unorganized/Anything", col: true, skip: true },
-    { dir: "Grateful Dead - Unorganized", col: false, skip: false },
+    { base: "/", path: "Jerry Garcia Band/1.mp3", col: true, skip: false },
+    { base: "/", path: "Grateful Dead - Unorganized/Album1/1.mp3", col: true, skip: true },
+    { base: "/Grateful Dead - Unorganized", path: "1.mp3", col: false, skip: true },
   }
 
   for i := range tests {
     flags.Collection = tests[i].col
     defer func() { flags.Collection = false }()
 
-    r := skipArtistOnCollection(tests[i].dir)
+    r := skipFolder(tests[i].base, tests[i].path)
     if r != tests[i].skip {
-      t.Errorf("Expected %v, got %v", tests[i].skip, r)
+      t.Errorf("%v: Expected %v, got %v", tests[i].base+tests[i].path, tests[i].skip, r)
     }
   }
 }
 
-func TestSkipFast(t *testing.T) {
+func TestSkipFolder(t *testing.T) {
   tests := []struct {
-    dir string
-    skip bool
+    base, path string
+    col, skip bool
   }{
-    { dir: "Random Dir", skip: false },
-    { dir: "Phish/2003/2003.07.09 Shoreline Amphitheatre, Mountain View, CA", skip: true },
+    { base: "/", path: "Random Dir/1.mp3", col: false, skip: true },
+    { base: "/", path: "Phish/2003/2003.07.09 Shoreline Amphitheatre, Mountain View, CA/1.mp3", col: true, skip: true },
   }
 
-  flags.Fast = true
-  defer func() { flags.Fast = false }()
-
   for i := range tests {
-    r := skipFast(tests[i].dir)
+    flags.Collection = tests[i].col
+    defer func() { flags.Collection = false }()
+
+    r := skipFolder(tests[i].base, tests[i].path)
     if r != tests[i].skip {
-      t.Errorf("Expected %v, got %v for %v", tests[i].skip, r, tests[i].dir)
+      t.Errorf("%v: Expected %v, got %v", tests[i].base+tests[i].path, tests[i].skip, r)
     }
   }
 }
@@ -99,7 +99,11 @@ func TestProcessMain(t *testing.T) {
   defer os.RemoveAll(a.DirEntry)
 
   flags.Write = true
-  defer func() { flags.Write = false }()
+  flags.Force = true
+  defer func() {
+    flags.Write = false
+    flags.Force = false
+  }()
 
   err := a.process()
 
