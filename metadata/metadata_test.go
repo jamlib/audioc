@@ -2,10 +2,36 @@ package metadata
 
 import (
   "strings"
+  "reflect"
   "testing"
 
   "github.com/JamTools/goff/ffprobe"
 )
+
+func TestNew(t *testing.T) {
+  tests := []struct {
+    base, path string
+    r *Metadata
+  }{
+    { base: "/dir1", path: "dir2/dir3/file1.ext",
+      r: &Metadata{ Basepath: "/dir1", Fullpath: "/dir1/dir2/dir3/file1.ext",
+        Fulldir: "/dir1/dir2/dir3", Infodir: "dir2/dir3",
+      },
+    },{
+      base: "/dir3/dir4", path: "file2.ext",
+      r: &Metadata{ Basepath: "/dir3/dir4", Fullpath: "/dir3/dir4/file2.ext",
+        Fulldir: "/dir3/dir4", Infodir: "dir4",
+      },
+    },
+  }
+
+  for x := range tests {
+    result := New(tests[x].base, tests[x].path)
+    if !reflect.DeepEqual(result, tests[x].r) {
+      t.Errorf("Expected %v, got %v", tests[x].r, result)
+    }
+  }
+}
 
 func TestToAlbum(t *testing.T) {
   tests := []struct {
@@ -99,7 +125,7 @@ func TestInfoFromFile(t *testing.T) {
 
   for x := range tests {
     i := &Info{}
-    i.fromFile(tests[x][0][0])
+    i.FromFile(tests[x][0][0])
     compare := []string{ i.Year, i.Month, i.Day, i.Disc, i.Track, i.Title }
     if strings.Join(compare, "\n") != strings.Join(tests[x][1], "\n") {
       t.Errorf("Expected %v, got %v", tests[x][1], compare)
@@ -120,7 +146,7 @@ func TestInfoFromPath(t *testing.T) {
 
   for x := range tests {
     i := &Info{}
-    i.fromPath(tests[x][0][0])
+    i.FromPath(tests[x][0][0])
     compare := []string{ i.Year, i.Month, i.Day, i.Album }
     if strings.Join(compare, "\n") != strings.Join(tests[x][1], "\n") {
       t.Errorf("Expected %v, got %v", tests[x][1], compare)
