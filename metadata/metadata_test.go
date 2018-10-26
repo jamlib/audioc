@@ -5,7 +5,7 @@ import (
   "reflect"
   "testing"
 
-  "github.com/JamTools/goff/ffprobe"
+  "github.com/jamlib/libaudio/ffprobe"
 )
 
 func TestNew(t *testing.T) {

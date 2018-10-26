@@ -8,9 +8,9 @@ import (
   "io/ioutil"
   "path/filepath"
 
-  "github.com/JamTools/goff/ffmpeg"
-  "github.com/JamTools/goff/ffprobe"
-  "github.com/JamTools/goff/fsutil"
+  "github.com/jamlib/libaudio/ffmpeg"
+  "github.com/jamlib/libaudio/ffprobe"
+  "github.com/jamlib/libaudio/fsutil"
 )
 
 // passes a shared TempDir and labels: folder.jpg, folder-orig.jpg to

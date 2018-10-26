@@ -8,8 +8,8 @@ import (
   "strings"
   "path/filepath"
 
-  "github.com/JamTools/goff/ffprobe"
-  "github.com/JamTools/goff/fsutil"
+  "github.com/jamlib/libaudio/ffprobe"
+  "github.com/jamlib/libaudio/fsutil"
 )
 
 type Metadata struct {

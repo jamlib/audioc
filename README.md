@@ -1,11 +1,11 @@
-# audiocc
+# audioc
 
-Audio Collection Cleanup
+Clean up audio collection setting meta tags & embedding artwork
 
 ## Usage
 
 ```
-Usage: audiocc [OPTIONS] PATH
+Usage: audioc [OPTIONS] PATH
 
 Positional Args:
   PATH           directory path
@@ -127,11 +127,11 @@ Including `--write` will apply changes to disk.
 
 Get latest source, run:
 
-    go get github.com/JamTools/audiocc
+    go get github.com/jamlib/audioc
 
 Navigate to source path, run:
 
-    cd $GOPATH/src/github.com/JamTools/audiocc
+    cd $GOPATH/src/github.com/jamlib/audioc
 
 Ensure dependencies are installed and up-to-date with `dep`, run:
 
@@ -143,7 +143,7 @@ From within source path, to build the binary, run:
 
 To test by displaying usage, run:
 
-    audiocc --help
+    audioc --help
 
 ### Testing
 

@@ -16,10 +16,10 @@ Positional Args:
 `
 
 const printUsage = `
-audiocc v%s
+audioc v%s
 %s
 
-Usage: audiocc [MODE] [OPTIONS] PATH
+Usage: audioc [MODE] [OPTIONS] PATH
 %s
 Mode (specify only one):
   --artist "NAME"

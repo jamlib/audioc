@@ -12,14 +12,14 @@ import (
   "io/ioutil"
   "path/filepath"
 
-  "github.com/JamTools/goff/ffmpeg"
-  "github.com/JamTools/goff/ffprobe"
-  "github.com/JamTools/goff/fsutil"
-  "github.com/JamTools/audiocc/albumart"
-  "github.com/JamTools/audiocc/metadata"
+  "github.com/jamlib/libaudio/ffmpeg"
+  "github.com/jamlib/libaudio/ffprobe"
+  "github.com/jamlib/libaudio/fsutil"
+  "github.com/jamlib/audioc/albumart"
+  "github.com/jamlib/audioc/metadata"
 )
 
-type audiocc struct {
+type audioc struct {
   DirEntry string
   Image string
   Ffmpeg ffmpeg.Ffmpeger
@@ -45,7 +45,7 @@ func main() {
     log.Fatal(err)
   }
 
-  a := &audiocc{ Ffmpeg: ffm, Ffprobe: ffp, Workers: runtime.NumCPU(),
+  a := &audioc{ Ffmpeg: ffm, Ffprobe: ffp, Workers: runtime.NumCPU(),
     DirEntry: filepath.Clean(args[0]) }
 
   err = a.process()
@@ -87,7 +87,7 @@ func skipFolder(base, path string) bool {
 }
 
 // process album art once per folder of files
-func (a *audiocc) processArtwork(file string) error {
+func (a *audioc) processArtwork(file string) error {
   art := &albumart.AlbumArt{ Ffmpeg: a.Ffmpeg, Ffprobe: a.Ffprobe,
     ImgDecode: image.DecodeConfig, WithParentDir: true,
     Fullpath: filepath.Join(a.DirEntry, file) }
@@ -103,7 +103,7 @@ func (a *audiocc) processArtwork(file string) error {
   return nil
 }
 
-func (a *audiocc) process() error {
+func (a *audioc) process() error {
   if !flags.Write {
     fmt.Printf("\n* To write changes to disk, please provide flag: --write\n")
   }
@@ -123,11 +123,11 @@ func (a *audiocc) process() error {
     return err
   }
 
-  fmt.Printf("\naudiocc finished.\n")
+  fmt.Printf("\naudioc finished.\n")
   return nil
 }
 
-func (a *audiocc) processFolder(indexes []int) error {
+func (a *audioc) processFolder(indexes []int) error {
   fullDir := filepath.Dir(filepath.Join(a.DirEntry, a.Files[indexes[0]]))
 
   // skip if possible (unless --force)
@@ -192,7 +192,7 @@ func mergeFolderFunc(f string) (int, string) {
   return (disc*1000)+track, i.Title
 }
 
-func (a *audiocc) processThreaded(indexes []int) (string, error) {
+func (a *audioc) processThreaded(indexes []int) (string, error) {
   var err error
   jobs := make(chan int)
   dir := make(chan string, a.Workers)
@@ -235,7 +235,7 @@ func (a *audiocc) processThreaded(indexes []int) (string, error) {
   return resultDir, err
 }
 
-func (a *audiocc) processFile(index int) (string, error) {
+func (a *audioc) processFile(index int) (string, error) {
   m := metadata.New(a.DirEntry, a.Files[index])
 
   // if --artist mode, remove innermost dir from basepath so it ends up in infodir
@@ -304,7 +304,7 @@ func (a *audiocc) processFile(index int) (string, error) {
   return path, nil
 }
 
-func (a *audiocc) processMp3(f string, i *metadata.Info) (string, error) {
+func (a *audioc) processMp3(f string, i *metadata.Info) (string, error) {
   // if already mp3, copy stream; do not convert
   quality := flags.Bitrate
   if strings.ToLower(filepath.Ext(f)) == ".mp3" {

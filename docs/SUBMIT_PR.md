@@ -4,7 +4,7 @@ Fork repo on Github.
 
 From within source path, setup new remote, run:
 
-    git remote add myfork git@github.com:$GITHUB-USERNAME/audiocc.git
+    git remote add myfork git@github.com:$GITHUB-USERNAME/audioc.git
 
 Create a new branch to use for development, run:
 

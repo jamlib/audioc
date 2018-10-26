@@ -5,9 +5,9 @@ import (
   "testing"
   "encoding/json"
 
-  "github.com/JamTools/goff/ffmpeg"
-  "github.com/JamTools/goff/ffprobe"
-  "github.com/JamTools/goff/fsutil"
+  "github.com/jamlib/libaudio/ffmpeg"
+  "github.com/jamlib/libaudio/ffprobe"
+  "github.com/jamlib/libaudio/fsutil"
 )
 
 func TestSkipArtistOnCollection(t *testing.T) {
@@ -52,7 +52,7 @@ func TestSkipFolder(t *testing.T) {
 }
 
 func TestProcessDirDNE(t *testing.T) {
-  a := &audiocc{ DirEntry: "audiocc-dir-def-dne" }
+  a := &audioc{ DirEntry: "audioc-dir-def-dne" }
   err := a.process()
   if err == nil {
     t.Errorf("Expected error, got none.")
@@ -64,8 +64,8 @@ type TestProcessFiles struct {
   data *ffprobe.Tags
 }
 
-func createTestProcessFiles(t *testing.T, files []*TestProcessFiles) (*audiocc, []int) {
-  a := &audiocc{ Ffmpeg: &ffmpeg.MockFfmpeg{}, Ffprobe: &ffprobe.MockFfprobe{},
+func createTestProcessFiles(t *testing.T, files []*TestProcessFiles) (*audioc, []int) {
+  a := &audioc{ Ffmpeg: &ffmpeg.MockFfmpeg{}, Ffprobe: &ffprobe.MockFfprobe{},
     Files: []string{}, Workers: 1 }
 
   indexes := []int{}

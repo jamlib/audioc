@@ -3,17 +3,17 @@
 
 [[projects]]
   branch = "master"
-  name = "github.com/JamTools/goff"
+  name = "github.com/jamlib/libaudio"
   packages = [
     "ffmpeg",
     "ffprobe",
     "fsutil"
   ]
-  revision = "1a879854921cbb2b613ef3d490aab84404280b39"
+  revision = "241460a81e5e2b18838ddad0d13c11cba4599dc6"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "d013f575a3692709d1c4af54c6a03c3798344e66e0bce1ad550ef05702fce0e6"
+  inputs-digest = "1641a57ff592566b90ca79eefbb6cb1b1bf1e054f8e0ac322be1356727e07ad5"
   solver-name = "gps-cdcl"
   solver-version = 1

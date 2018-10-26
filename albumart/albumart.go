@@ -12,8 +12,8 @@ import (
   _ "image/jpeg"
   _ "image/png"
 
-  "github.com/JamTools/goff/ffprobe"
-  "github.com/JamTools/goff/fsutil"
+  "github.com/jamlib/libaudio/ffprobe"
+  "github.com/jamlib/libaudio/fsutil"
 )
 
 type AlbumArt struct {
