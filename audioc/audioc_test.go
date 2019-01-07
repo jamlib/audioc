@@ -1,4 +1,4 @@
-package main
+package audioc
 
 import (
   "os"
@@ -21,10 +21,9 @@ func TestSkipArtistOnCollection(t *testing.T) {
   }
 
   for i := range tests {
-    flags.Collection = tests[i].col
-    defer func() { flags.Collection = false }()
+    a := &audioc{ Flags: flags{ Collection: tests[i].col } }
 
-    r := skipFolder(tests[i].base, tests[i].path)
+    r := a.skipFolder(tests[i].base, tests[i].path)
     if r != tests[i].skip {
       t.Errorf("%v: Expected %v, got %v", tests[i].base+tests[i].path, tests[i].skip, r)
     }
@@ -41,10 +40,9 @@ func TestSkipFolder(t *testing.T) {
   }
 
   for i := range tests {
-    flags.Collection = tests[i].col
-    defer func() { flags.Collection = false }()
+    a := &audioc{ Flags: flags{ Collection: tests[i].col } }
 
-    r := skipFolder(tests[i].base, tests[i].path)
+    r := a.skipFolder(tests[i].base, tests[i].path)
     if r != tests[i].skip {
       t.Errorf("%v: Expected %v, got %v", tests[i].base+tests[i].path, tests[i].skip, r)
     }
@@ -53,7 +51,7 @@ func TestSkipFolder(t *testing.T) {
 
 func TestProcessDirDNE(t *testing.T) {
   a := &audioc{ DirEntry: "audioc-dir-def-dne" }
-  err := a.process()
+  err := a.Process()
   if err == nil {
     t.Errorf("Expected error, got none.")
   }
@@ -98,14 +96,10 @@ func TestProcessMain(t *testing.T) {
   })
   defer os.RemoveAll(a.DirEntry)
 
-  flags.Write = true
-  flags.Force = true
-  defer func() {
-    flags.Write = false
-    flags.Force = false
-  }()
+  a.Flags.Write = true
+  a.Flags.Force = true
 
-  err := a.process()
+  err := a.Process()
 
   // ensure no errors in process
   if err != nil {

@@ -1,8 +1,12 @@
 package main
 
 import (
+  "os"
   "fmt"
   "flag"
+  "path/filepath"
+
+  "github.com/jamlib/audioc/audioc"
 )
 
 const (
@@ -49,59 +53,57 @@ Debug:
     print program version, then exit
 `
 
-type Flags struct {
-  Artist, Bitrate string
-  Collection, Fix, Force, Version, Write bool
-}
+func configFromFlags() (*audioc.Config, bool) {
+  c := audioc.Config{}
+  flags := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 
-var flags = Flags{}
+  // set mode
+  flags.StringVar(&c.Flags.Artist, "artist", "", "")
+  flags.BoolVar(&c.Flags.Collection, "collection", false, "")
 
-func init() {
-  // setup mode
-  flag.StringVar(&flags.Artist, "artist", "", "")
-  flag.BoolVar(&flags.Collection, "collection", false, "")
-  // setup options
-  flag.StringVar(&flags.Bitrate, "bitrate", "V0", "")
-  flag.BoolVar(&flags.Fix, "fix", false, "")
-  flag.BoolVar(&flags.Force, "force", false, "")
-  flag.BoolVar(&flags.Write, "write", false, "")
-  // detup debug options
-  flag.BoolVar(&flags.Version, "version", false, "")
+  // set options
+  flags.StringVar(&c.Flags.Bitrate, "bitrate", "V0", "")
+  flags.BoolVar(&c.Flags.Fix, "fix", false, "")
+  flags.BoolVar(&c.Flags.Force, "force", false, "")
+  flags.BoolVar(&c.Flags.Write, "write", false, "")
 
-  // --help
-  flag.Usage = func() {
+  // set debug options
+  flags.BoolVar(&c.Flags.Version, "version", false, "")
+
+  // create --help closure
+  flags.Usage = func() {
     fmt.Printf(printUsage, version, description, args)
     fmt.Println()
   }
-}
 
-func processFlags() ([]string, bool) {
-  flag.Parse()
-  a := flag.Args()
+  // process flags
+  flags.Parse(os.Args[1:])
+  a := flags.Args()
 
   // --version
-  if flags.Version {
+  if c.Flags.Version {
     fmt.Printf("%s\n", version)
-    return a, false
+    return &c, false
   }
 
   // show --help unless args
   if len(a) != 1 {
-    flag.Usage()
-    return a, false
+    flags.Usage()
+    return &c, false
   }
 
   // must specify --artist OR --collection
-  if flags.Artist == "" && !flags.Collection {
+  if c.Flags.Artist == "" && !c.Flags.Collection {
     fmt.Printf("\nError: Must provide option --artist OR --collection\n")
-    flag.Usage()
-    return a, false
+    flags.Usage()
+    return &c, false
   }
 
   // default to V0 unless 320 specified
-  if flags.Bitrate != "320" {
-    flags.Bitrate = "V0"
+  if c.Flags.Bitrate != "320" {
+    c.Flags.Bitrate = "V0"
   }
 
-  return a, true
+  c.DirEntry = filepath.Clean(a[0])
+  return &c, true
 }
