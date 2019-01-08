@@ -139,13 +139,15 @@ func (a *audioc) processFolder(indexes []int) error {
   if err != nil {
     return err
   }
-  defer os.RemoveAll(a.Workdir)
 
   // process folder via threads returning the resulting dir
   dir, err := a.processThreaded(indexes)
   if err != nil {
     return err
   }
+
+  // remove workdir here else forder is renamed and workdir becomes invalid
+  os.RemoveAll(a.Workdir)
 
   // if not same dir, rename directory to target dir
   if fullDir != dir {
@@ -272,7 +274,8 @@ func (a *audioc) processFile(index int) (string, error) {
   // convert audio (if necessary) & update tags
   ext := strings.ToLower(filepath.Ext(m.Fullpath))
   if ext != ".flac" || regexp.MustCompile(` - FLAC$`).FindString(m.Infodir) == "" {
-    // convert to mp3 except flac files with " - FLAC" in folder name
+    // skip converting if folder contains ' - FLAC'
+
     _, err := a.processMp3(m.Fullpath, i)
     if err != nil {
       return "", err
@@ -296,6 +299,11 @@ func (a *audioc) processFile(index int) (string, error) {
 }
 
 func (a *audioc) processMp3(f string, i *metadata.Info) (string, error) {
+  // skip if not writing
+  if !a.Flags.Write {
+    return "", nil
+  }
+
   // if already mp3, copy stream; do not convert
   quality := a.Flags.Bitrate
   if strings.ToLower(filepath.Ext(f)) == ".mp3" {
@@ -324,27 +332,21 @@ func (a *audioc) processMp3(f string, i *metadata.Info) (string, error) {
     return newFile, err
   }
 
-  // if flagsWrite & resulting file has size
+  // ensure resulting file has size
   // TODO: ensure resulting file is good by reading & comparing metadata
-  if fi.Size() > 0 {
-    file := filepath.Join(filepath.Dir(f), i.ToFile() + ".mp3")
-
-    if a.Flags.Write {
-      // delete original
-      err = os.Remove(f)
-      if err != nil {
-        return file, err
-      }
-
-      // move new to original directory
-      err = os.Rename(newFile, file)
-      if err != nil {
-        return file, err
-      }
-    }
-
-    return file, nil
+  if fi.Size() <= 0 {
+    return newFile, fmt.Errorf("File didn't have size")
   }
 
-  return newFile, fmt.Errorf("File didn't have size")
+  file := filepath.Join(filepath.Dir(f), i.ToFile() + ".mp3")
+
+  // delete original
+  err = os.Remove(f)
+  if err != nil {
+    return file, err
+  }
+
+  // move new to original directory
+  err = os.Rename(newFile, file)
+  return file, err
 }

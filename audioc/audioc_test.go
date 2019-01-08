@@ -90,7 +90,7 @@ func TestProcessMain(t *testing.T) {
       "dir2/file2.mp3",
       &ffprobe.Tags{
         Album: "2003.07.18 Alpine Valley, East Troy, WI",
-        Track: "1", Title: "Axilla I",
+        Track: "01", Title: "Axilla I",
       },
     },
   })
@@ -108,8 +108,8 @@ func TestProcessMain(t *testing.T) {
 
   // compare relative folder path & file name with expected result
   fileResults := []string{
-    "2003.07.17 Bonner Springs, KS/1-1 Chalk Dust Torture.mp3",
-    "2003.07.18 Alpine Valley, East Troy, WI/1 Axilla I.mp3",
+    "2003.07.17 Bonner Springs, KS/01-01 Chalk Dust Torture.mp3",
+    "2003.07.18 Alpine Valley, East Troy, WI/01 Axilla I.mp3",
   }
 
   files := fsutil.FilesAudio(a.DirEntry)
