@@ -126,7 +126,6 @@ func (a *audioc) processArtwork(file string) error {
   return err
 }
 
-
 // passed to fsutil.MergeFolder
 func mergeFolderFunc(f string) (int, string) {
   // split filename from path
