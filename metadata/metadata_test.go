@@ -2,7 +2,6 @@ package metadata
 
 import (
   "strings"
-  "reflect"
   "testing"
 
   "github.com/jamlib/libaudio/ffprobe"
@@ -10,25 +9,18 @@ import (
 
 func TestNew(t *testing.T) {
   tests := []struct {
-    base, path string
-    r *Metadata
+    base, path, r string
   }{
-    { base: "/dir1", path: "dir2/dir3/file1.ext",
-      r: &Metadata{ Basepath: "/dir1", Fullpath: "/dir1/dir2/dir3/file1.ext",
-        Fulldir: "/dir1/dir2/dir3", Infodir: "dir2/dir3",
-      },
+    { base: "/dir1", path: "dir2/dir3/file1.ext", r: "dir2/dir3",
     },{
-      base: "/dir3/dir4", path: "file2.ext",
-      r: &Metadata{ Basepath: "/dir3/dir4", Fullpath: "/dir3/dir4/file2.ext",
-        Fulldir: "/dir3/dir4", Infodir: "dir4",
-      },
+      base: "/dir3/dir4", path: "file2.ext", r: "dir4",
     },
   }
 
   for x := range tests {
     result := New(tests[x].base, tests[x].path)
-    if !reflect.DeepEqual(result, tests[x].r) {
-      t.Errorf("Expected %v, got %v", tests[x].r, result)
+    if result.Infodir != tests[x].r {
+      t.Errorf("Expected %v, got %v", tests[x].r, result.Infodir)
     }
   }
 }
@@ -99,7 +91,7 @@ func TestMatchProbeTags(t *testing.T) {
       info: &Info{ Disc: "1" },
       tags: &ffprobe.Tags{ Disc: "1/2" },
       comb: &Info{ Disc: "1" },
-      match: true,
+      match: false,
     },
   }
 
@@ -111,7 +103,7 @@ func TestMatchProbeTags(t *testing.T) {
     }
 
     if match != tests[x].match {
-      t.Errorf("Expected %v, got %v", match, tests[x].match)
+      t.Errorf("Expected %v, got %v for %v", tests[x].match, match, tests[x].comb)
     }
   }
 }

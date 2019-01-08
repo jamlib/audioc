@@ -13,66 +13,58 @@ import (
 )
 
 type Metadata struct {
-  Artist string
-  Basepath string
-  Fullpath string
-  Fulldir string
-  Infodir string
+  Basepath, Filepath, Infodir string
   Match bool
+  Info *Info
 }
 
-type Ffprober interface {
-  GetData(filePath string) (*ffprobe.Data, error)
-}
-
-// audio file info derived from file path & embedded metadata
 type Info struct {
   Artist, Album, Year, Month, Day string
   Disc, Track, Title string
 }
 
-func New(base, path string) *Metadata {
-  m := &Metadata{
-    Basepath: base,
-    Fullpath: filepath.Join(base, path),
-  }
-  m.Fulldir = filepath.Dir(m.Fullpath)
+// Ffprober within context of metadata only needs to implement GetData
+type Ffprober interface {
+  GetData(filePath string) (*ffprobe.Data, error)
+}
 
-  m.Infodir = strings.TrimPrefix(m.Fulldir, m.Basepath)
-  m.Infodir = strings.TrimPrefix(m.Infodir, fsutil.PathSep)
-  if m.Infodir == "" {
-    // use innermost dir of fullpath
-    m.Infodir = filepath.Base(m.Fulldir)
+// create metadata, set Infodir
+func New(basePath, filePath string) *Metadata {
+  m := &Metadata{ Basepath: basePath, Filepath: filePath,
+    Infodir: filepath.Dir(filePath), Info: &Info{},
+  }
+
+  // if no Infodir, use innermost dir of basePath 
+  if m.Infodir == "" || m.Infodir == "." {
+    m.Infodir = filepath.Base(basePath)
   }
 
   return m
 }
 
-func (m *Metadata) NewInfo(ffp Ffprober) (*Metadata, *Info, error) {
-  i := &Info{}
-  i.FromPath(m.Infodir)
+func (m *Metadata) Probe(ffp Ffprober) error {
+  fp := filepath.Join(m.Basepath, m.Filepath)
+  _, file := filepath.Split(m.Filepath)
+
+  // info from path & file name
+  m.Info.FromPath(m.Infodir)
+  m.Info.FromFile(strings.TrimSuffix(file, filepath.Ext(file)))
 
   // info from embedded tags within audio file
-  d, err := ffp.GetData(m.Fullpath)
+  d, err := ffp.GetData(fp)
   if err != nil {
-    return m, i, err
+    return err
   }
 
-  // artist specified or artist within tags
-  if m.Artist != "" {
-    i.Artist = m.Artist
-  } else {
-    i.Artist = d.Format.Tags.Artist
+  // if artist not yet specified, use ffprobe artist tag
+  if m.Info.Artist == "" {
+    m.Info.Artist = d.Format.Tags.Artist
   }
-
-  // info from file name
-  _, file := filepath.Split(m.Fullpath)
-  i.FromFile(strings.TrimSuffix(file, filepath.Ext(file)))
 
   // combine info w/ embedded tags
-  i, m.Match = i.MatchProbeTags(d.Format.Tags)
+  m.Info, m.Match = m.Info.MatchProbeTags(d.Format.Tags)
 
-  return m, i, nil
+  return nil
 }
 
 // returns album prefixed with fulldate, year, or nothing (if no year)
@@ -86,90 +78,105 @@ func (i *Info) ToAlbum() string {
   return i.Album
 }
 
-// returns filename string from Disc, Track, Title (ex: "1-01 Title.mp3")
+// returns filename string from Disc, Track, Title (ex: "01-01 Title.mp3")
 // without Disc (ex: "01 Title.mp3")
 func (i *Info) ToFile() string {
-  var out string
-  if len(i.Disc) > 0 {
-    out += paddedDiscTrack(i.Disc) + "-"
+  // closure to pad Disc & Track
+  pad := func (s string) string {
+    d, _ := strconv.Atoi(s)
+    if d == 0 {
+      return ""
+    }
+    return fmt.Sprintf("%02d", d)
   }
 
-  return out + paddedDiscTrack(i.Track) + " " + safeFilename(i.Title)
+  var out string
+  if len(i.Disc) > 0 {
+    out += pad(i.Disc) + "-"
+  }
+  if len(i.Track) > 0 {
+    out += pad(i.Track) + " "
+  }
+  return out + safeFilename(i.Title)
 }
 
-// compare file path info against ffprobe.Tags and combine into best info
+// compare file & path info against ffprobe.Tags and combine into best info
 // return includes boolean if info sources match (no update necessary)
 func (i *Info) MatchProbeTags(p *ffprobe.Tags) (*Info, bool) {
+
   // build info from ffprobe.Tags
   tagInfo := &Info{
     Artist: p.Artist,
-    // match Disc "1/2" as "1"
-    Disc: regexp.MustCompile(`^\d+`).FindString(p.Disc),
+    Disc: p.Disc,
     Track: p.Track,
-    Title: matchAlbumOrTitle(p.Title),
+    Title: safeFilename(p.Title),
   }
-  tagInfo.fromAlbum(p.Album)
+
+  // separate date from album
+  a := p.Album
+  a = tagInfo.matchDate(a)
+  a = tagInfo.matchYearOnly(a)
+  tagInfo.Album = safeFilename(a)
 
   // compare using safeFilename since info is derived from filename
   compare := tagInfo
   compare.Title = safeFilename(compare.Title)
 
-  // TODO: ensure disc/track are evenly padded
-
   if *i != *compare {
     // combine infos
-    result := tagInfo
+    r := tagInfo
+
+    // info overrides probe for Artist
+    if r.Artist != i.Artist {
+      r.Artist = i.Artist
+    }
 
     // update Year, Month, Day, Disc, Track if not set
-    if len(result.Year) == 0 {
-      result.Year = i.Year
+    if len(r.Year) == 0 {
+      r.Year = i.Year
     }
-    if len(result.Month) == 0 {
-      result.Month = i.Month
+    if len(r.Month) == 0 {
+      r.Month = i.Month
     }
-    if len(result.Day) == 0 {
-      result.Day = i.Day
+    if len(r.Day) == 0 {
+      r.Day = i.Day
     }
-    if len(result.Disc) == 0 {
-      result.Disc = i.Disc
+    if len(r.Disc) == 0 || regexp.MustCompile(`^\d+`).FindString(r.Disc) != r.Disc {
+      r.Disc = i.Disc
     }
-    if len(result.Track) == 0 {
-      result.Track = i.Track
+    if len(r.Track) == 0 {
+      r.Track = i.Track
     }
 
     // update Album, Title if longer
-    if len(result.Album) < len(i.Album) {
-      result.Album = i.Album
-    }
-    if len(result.Title) < len(i.Title) {
-      result.Title = i.Title
+    r.Album = strings.TrimSpace(r.Album)
+    if len(r.Album) < len(i.Album) {
+      r.Album = i.Album
     }
 
-    return result, false
+    if len(r.Title) < len(i.Title) {
+      r.Title = i.Title
+    }
+
+    return r, false
   }
 
   return i, true
 }
 
-// determine Disc, Year, Month, Day, Album from album string
-func (i *Info) fromAlbum(s string) {
-  i.matchDiscOnly(s)
-  s = i.matchDate(s)
-  s = i.matchYearOnly(s)
-  if len(i.Album) == 0 {
-    i.Album = matchAlbumOrTitle(s)
-  }
-}
-
 // determine Disc, Year, Month, Day, Track, Title from file string
 func (i *Info) FromFile(s string) *Info {
+  strs := []string{i.Artist, i.Album}
+
+  // trim slice of prefixes w/ multiple separator variations
+  for x := range strs {
+    s = strings.TrimLeft(s, strs[x] + " - ")
+    s = strings.TrimLeft(s, strs[x] + "-")
+  }
+
   s = i.matchDate(s)
   s = i.matchDiscTrack(s)
   i.Title = matchAlbumOrTitle(s)
-
-  // remove various prefixes
-  i.Title = strings.TrimLeft(i.Title, i.Artist + " - ")
-  i.Title = strings.TrimLeft(i.Title, i.Artist + "-")
 
   return i
 }
@@ -179,7 +186,14 @@ func (i *Info) FromPath(p string) *Info {
   // start inner-most folder, work out
   sa := strings.Split(p, fsutil.PathSep)
   for x := len(sa)-1; x >= 0; x-- {
-    i.fromAlbum(sa[x])
+    // determine Disc, Year, Month, Day, Album
+    sa[x] = i.matchDiscOnly(sa[x])
+    sa[x] = i.matchDate(sa[x])
+    sa[x] = i.matchYearOnly(sa[x])
+
+    if len(i.Album) == 0 {
+      i.Album = matchAlbumOrTitle(sa[x])
+    }
   }
   return i
 }
@@ -300,15 +314,6 @@ var discTrackRegexps = []string{
   `[sd](?P<disc>\d{1})[-. _t]*(?P<track>\d{1})`,
 }
 
-func paddedDiscTrack(s string) string {
-  d, _ := strconv.Atoi(s)
-  if d == 0 {
-    return ""
-  }
-
-  return fmt.Sprintf("%02d", d)
-}
-
 func (i *Info) matchDiscTrack(s string) string {
   for _, regExpStr := range discTrackRegexps {
     m, r := regexpMatch(s, regExpStr)
@@ -321,17 +326,23 @@ func (i *Info) matchDiscTrack(s string) string {
       m[x] = regexp.MustCompile(`^0+`).ReplaceAllString(m[x], "")
     }
 
-    i.Disc, i.Track = m[1], m[2]
+    i.Track = m[2]
+    if len(i.Disc) == 0 {
+      i.Disc = m[1]
+    }
+
     return r
   }
   return s
 }
 
-func (i *Info) matchDiscOnly(s string) {
-  m, _ := regexpMatch(s, `(?i)(cd|disc|set|disk)\s*(?P<disc>\d{1,2})\s*`)
+func (i *Info) matchDiscOnly(s string) string {
+  m, r := regexpMatch(s, `(?i)(cd|disc|set|disk)\s*(?P<disc>\d{1,2})\s*`)
   if len(m) >= 3 && len(i.Disc) == 0 {
     i.Disc = m[2]
+    return r
   }
+  return s
 }
 
 func regexpMatch(s, regExpStr string) ([]string, string) {
@@ -384,5 +395,5 @@ func fixWhitespace(s string) string {
 
 // strip out characters from filename
 func safeFilename(f string) string {
-  return regexp.MustCompile(`[^A-Za-z0-9-,'!?& _()]+`).ReplaceAllString(f, "")
+  return fixWhitespace(regexp.MustCompile(`[^A-Za-z0-9-,'!?& _()]+`).ReplaceAllString(f, ""))
 }
