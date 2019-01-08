@@ -60,10 +60,10 @@ func TestToFile(t *testing.T) {
     result string
   }{
     { i: &Info{ Disc: "", Track: "6", Title: "After Midnight" },
-      result: "6 After Midnight",
+      result: "06 After Midnight",
     },{
       i: &Info{ Disc: "2", Track: "03", Title: "Russian Lullaby" },
-      result: "2-03 Russian Lullaby",
+      result: "02-03 Russian Lullaby",
     },
   }
 

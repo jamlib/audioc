@@ -52,25 +52,22 @@ func (m *Metadata) NewInfo(ffp Ffprober) (*Metadata, *Info, error) {
   i := &Info{}
   i.FromPath(m.Infodir)
 
-  // info from file name
-  _, file := filepath.Split(m.Fullpath)
-  file = strings.TrimSuffix(file, filepath.Ext(file))
-  i.FromFile(file)
-
   // info from embedded tags within audio file
   d, err := ffp.GetData(m.Fullpath)
   if err != nil {
     return m, i, err
   }
 
-  // choose best artist
-  if i.Artist == "" {
-    if m.Artist != "" {
-      i.Artist = m.Artist
-    } else {
-      i.Artist = d.Format.Tags.Artist
-    }
+  // artist specified or artist within tags
+  if m.Artist != "" {
+    i.Artist = m.Artist
+  } else {
+    i.Artist = d.Format.Tags.Artist
   }
+
+  // info from file name
+  _, file := filepath.Split(m.Fullpath)
+  i.FromFile(strings.TrimSuffix(file, filepath.Ext(file)))
 
   // combine info w/ embedded tags
   i, m.Match = i.MatchProbeTags(d.Format.Tags)
@@ -94,10 +91,10 @@ func (i *Info) ToAlbum() string {
 func (i *Info) ToFile() string {
   var out string
   if len(i.Disc) > 0 {
-    out += i.Disc + "-"
+    out += paddedDiscTrack(i.Disc) + "-"
   }
 
-  return out + i.Track + " " + safeFilename(i.Title)
+  return out + paddedDiscTrack(i.Track) + " " + safeFilename(i.Title)
 }
 
 // compare file path info against ffprobe.Tags and combine into best info
@@ -169,6 +166,10 @@ func (i *Info) FromFile(s string) *Info {
   s = i.matchDate(s)
   s = i.matchDiscTrack(s)
   i.Title = matchAlbumOrTitle(s)
+
+  // remove various prefixes
+  i.Title = strings.TrimLeft(i.Title, i.Artist + " - ")
+  i.Title = strings.TrimLeft(i.Title, i.Artist + "-")
 
   return i
 }
@@ -299,6 +300,15 @@ var discTrackRegexps = []string{
   `[sd](?P<disc>\d{1})[-. _t]*(?P<track>\d{1})`,
 }
 
+func paddedDiscTrack(s string) string {
+  d, _ := strconv.Atoi(s)
+  if d == 0 {
+    return ""
+  }
+
+  return fmt.Sprintf("%02d", d)
+}
+
 func (i *Info) matchDiscTrack(s string) string {
   for _, regExpStr := range discTrackRegexps {
     m, r := regexpMatch(s, regExpStr)
@@ -364,7 +374,7 @@ func matchAlbumOrTitle(s string) string {
   // replace _ with space
   s = regexp.MustCompile(`[_]+`).ReplaceAllString(s, " ")
 
-  return fixWhitespace(s)
+  return fixWhitespace(safeFilename(s))
 }
 
 // replace whitespaces with one space
@@ -374,5 +384,5 @@ func fixWhitespace(s string) string {
 
 // strip out characters from filename
 func safeFilename(f string) string {
-  return regexp.MustCompile(`[^A-Za-z0-9-'!?& _()]+`).ReplaceAllString(f, "")
+  return regexp.MustCompile(`[^A-Za-z0-9-,'!?& _()]+`).ReplaceAllString(f, "")
 }
