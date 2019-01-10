@@ -7,24 +7,6 @@ import (
   "github.com/jamlib/libaudio/ffprobe"
 )
 
-func TestNew(t *testing.T) {
-  tests := []struct {
-    base, path, r string
-  }{
-    { base: "/dir1", path: "dir2/dir3/file1.ext", r: "dir2/dir3",
-    },{
-      base: "/dir3/dir4", path: "file2.ext", r: "dir4",
-    },
-  }
-
-  for x := range tests {
-    result := New(tests[x].base, tests[x].path)
-    if result.Infodir != tests[x].r {
-      t.Errorf("Expected %v, got %v", tests[x].r, result.Infodir)
-    }
-  }
-}
-
 func TestToAlbum(t *testing.T) {
   tests := []struct {
     i *Info
@@ -110,36 +92,34 @@ func TestMatchProbeTags(t *testing.T) {
 
 func TestInfoFromFile(t *testing.T) {
   tests := [][][]string{
-    { { "sci160318d1_01_Shine" }, { "2016", "03", "18", "1", "1", "Shine" } },
-    { { "jgb1980-02-28d1t1 Sugaree" }, { "1980", "02", "28", "1", "1", "Sugaree" } },
-    { { "03 - 02 Cold Rain and Snow"}, { "", "", "", "3", "2", "Cold Rain and Snow" } },
+    { { "sci160318d1_01_Shine.mp3" }, { "2016", "03", "18", "1", "1", "Shine" } },
+    { { "jgb1980-02-28d1t1 Sugaree.flac" }, { "1980", "02", "28", "1", "1", "Sugaree" } },
+    { { "03 - 02 Cold Rain and Snow.m4a"}, { "", "", "", "3", "2", "Cold Rain and Snow" } },
   }
 
   for x := range tests {
-    i := &Info{}
-    i.FromFile(tests[x][0][0])
-    compare := []string{ i.Year, i.Month, i.Day, i.Disc, i.Track, i.Title }
+    m := New("", tests[x][0][0])
+    compare := []string{ m.Info.Year, m.Info.Month, m.Info.Day,
+      m.Info.Disc, m.Info.Track, m.Info.Title }
     if strings.Join(compare, "\n") != strings.Join(tests[x][1], "\n") {
       t.Errorf("Expected %v, got %v", tests[x][1], compare)
     }
   }
 }
 
-// also tests: fromAlbum
 func TestInfoFromPath(t *testing.T) {
   tests := [][][]string{
     {
-      { "Jerry Garcia Band/1980/1980.02.28 Kean College After Midnight - FLAC" },
+      { "Jerry Garcia Band/1980/1980.02.28 Kean College After Midnight - FLAC/1.mp3" },
       { "1980", "02", "28", "Kean College After Midnight" },
     },{
-      { "Grateful Dead/1975/1975 Blues For Allah" }, { "1975", "", "", "Blues For Allah" },
+      { "Grateful Dead/1975/1975 Blues For Allah/1.mp3" }, { "1975", "", "", "Blues For Allah" },
     },
   }
 
   for x := range tests {
-    i := &Info{}
-    i.FromPath(tests[x][0][0])
-    compare := []string{ i.Year, i.Month, i.Day, i.Album }
+    m := New("", tests[x][0][0])
+    compare := []string{ m.Info.Year, m.Info.Month, m.Info.Day, m.Info.Album }
     if strings.Join(compare, "\n") != strings.Join(tests[x][1], "\n") {
       t.Errorf("Expected %v, got %v", tests[x][1], compare)
     }
