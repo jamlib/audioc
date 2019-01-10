@@ -13,7 +13,7 @@ import (
 )
 
 type Metadata struct {
-  Basepath, Filepath, Infodir string
+  Basepath, Filepath string
   Match bool
   Info *Info
 }
@@ -28,30 +28,56 @@ type Ffprober interface {
   GetData(filePath string) (*ffprobe.Data, error)
 }
 
-// create metadata, set Infodir
+// filePath used to derive info
 func New(basePath, filePath string) *Metadata {
-  m := &Metadata{ Basepath: basePath, Filepath: filePath,
-    Infodir: filepath.Dir(filePath), Info: &Info{},
-  }
+  m := &Metadata{ Basepath: basePath, Filepath: filePath, Info: &Info{} }
 
-  // if no Infodir, use innermost dir of basePath 
-  if m.Infodir == "" || m.Infodir == "." {
-    m.Infodir = filepath.Base(basePath)
-  }
+  // info from path & file name
+  dir, file := filepath.Split(m.Filepath)
+  _ = m.FromPath(dir)
+  m.FromFile(strings.TrimSuffix(file, filepath.Ext(file)))
 
   return m
 }
 
+// derive info album info from nested folder path
+func (m *Metadata) FromPath(p string) []string {
+  sa := strings.Split(p, fsutil.PathSep)
+
+  // start inner-most folder, work out
+  for x := len(sa)-1; x >= 0; x-- {
+    // determine Disc, Year, Month, Day, Album
+    sa[x] = m.Info.matchDiscOnly(sa[x])
+    sa[x] = m.Info.matchDate(sa[x])
+    sa[x] = m.Info.matchYearOnly(sa[x])
+
+    // only overwrite album if not yet set
+    if len(m.Info.Album) == 0 {
+      m.Info.Album = matchAlbumOrTitle(sa[x])
+    }
+  }
+
+  return sa
+}
+
+// determine Disc, Year, Month, Day, Track, Title from file string
+func (m *Metadata) FromFile(s string) {
+  strs := []string{m.Info.Artist, m.Info.Album}
+
+  // trim slice of prefixes w/ multiple separator variations
+  for x := range strs {
+    s = strings.TrimLeft(s, strs[x] + " - ")
+    s = strings.TrimLeft(s, strs[x] + "-")
+  }
+
+  s = m.Info.matchDate(s)
+  s = m.Info.matchDiscTrack(s)
+  m.Info.Title = matchAlbumOrTitle(s)
+}
+
 func (m *Metadata) Probe(ffp Ffprober) error {
-  fp := filepath.Join(m.Basepath, m.Filepath)
-  _, file := filepath.Split(m.Filepath)
-
-  // info from path & file name
-  m.Info.FromPath(m.Infodir)
-  m.Info.FromFile(strings.TrimSuffix(file, filepath.Ext(file)))
-
   // info from embedded tags within audio file
-  d, err := ffp.GetData(fp)
+  d, err := ffp.GetData(filepath.Join(m.Basepath, m.Filepath))
   if err != nil {
     return err
   }
@@ -162,40 +188,6 @@ func (i *Info) MatchProbeTags(p *ffprobe.Tags) (*Info, bool) {
   }
 
   return i, true
-}
-
-// determine Disc, Year, Month, Day, Track, Title from file string
-func (i *Info) FromFile(s string) *Info {
-  strs := []string{i.Artist, i.Album}
-
-  // trim slice of prefixes w/ multiple separator variations
-  for x := range strs {
-    s = strings.TrimLeft(s, strs[x] + " - ")
-    s = strings.TrimLeft(s, strs[x] + "-")
-  }
-
-  s = i.matchDate(s)
-  s = i.matchDiscTrack(s)
-  i.Title = matchAlbumOrTitle(s)
-
-  return i
-}
-
-// derive info album info from nested folder path
-func (i *Info) FromPath(p string) *Info {
-  // start inner-most folder, work out
-  sa := strings.Split(p, fsutil.PathSep)
-  for x := len(sa)-1; x >= 0; x-- {
-    // determine Disc, Year, Month, Day, Album
-    sa[x] = i.matchDiscOnly(sa[x])
-    sa[x] = i.matchDate(sa[x])
-    sa[x] = i.matchYearOnly(sa[x])
-
-    if len(i.Album) == 0 {
-      i.Album = matchAlbumOrTitle(sa[x])
-    }
-  }
-  return i
 }
 
 // converts roman numeral to int; only needs to support up to 5
