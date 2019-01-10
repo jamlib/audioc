@@ -65,9 +65,8 @@ func (a *audioc) processFile(index int) (string, error) {
 
   // convert audio (if necessary) & update tags
   ext := strings.ToLower(filepath.Ext(fp))
-  if ext != ".flac" || regexp.MustCompile(` - FLAC$`).FindString(m.Infodir) == "" {
-    // skip converting if folder contains ' - FLAC'
-
+  if ext != ".flac" || !skipConvert(a.Files[index]) {
+    // convert to mp3
     _, err := a.processMp3(fp, m.Info)
     if err != nil {
       return "", err
@@ -88,6 +87,14 @@ func (a *audioc) processFile(index int) (string, error) {
 
   // resultPath is a directory
   return resultPath, nil
+}
+
+// skip converting if folder contains ' - FLAC'
+func skipConvert(file string) bool {
+  if regexp.MustCompile(` - FLAC$`).FindString(filepath.Dir(file)) == "" {
+    return false
+  }
+  return true
 }
 
 func (a *audioc) processMp3(f string, i *metadata.Info) (string, error) {
