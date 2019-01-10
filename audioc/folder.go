@@ -104,10 +104,9 @@ func (a *audioc) skipFolder(base, path string) bool {
 
   // true if album folder matches metadata.ToAlbum
   if len(alb) > 0 {
-    i := &metadata.Info{}
-    i.FromPath(alb)
+    m := metadata.New("", alb + fsutil.PathSep + "1.mp3")
 
-    if i.ToAlbum() == alb {
+    if m.Info.ToAlbum() == alb {
       return true
     }
   }
@@ -128,16 +127,12 @@ func (a *audioc) processArtwork(file string) error {
 
 // passed to fsutil.MergeFolder
 func mergeFolderFunc(f string) (int, string) {
-  // split filename from path
-  _, file := filepath.Split(f)
-
   // parse disc & track from filename
-  i := &metadata.Info{}
-  i.FromFile(file)
+  m := metadata.New("", f)
 
-  disc, _ := strconv.Atoi(regexp.MustCompile(`^\d+`).FindString(i.Disc))
-  track, _ := strconv.Atoi(regexp.MustCompile(`^\d+`).FindString(i.Track))
+  disc, _ := strconv.Atoi(regexp.MustCompile(`^\d+`).FindString(m.Info.Disc))
+  track, _ := strconv.Atoi(regexp.MustCompile(`^\d+`).FindString(m.Info.Track))
 
   // combine disc & track into unique integer
-  return (disc*1000)+track, i.Title
+  return (disc*1000)+track, m.Info.Title
 }
