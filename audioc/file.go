@@ -12,7 +12,7 @@ import (
   "github.com/jamlib/audioc/metadata"
 )
 
-func (a *audioc) processFile(index int) (string, error) {
+func (a *audioc) processFile(index int) (*metadata.Metadata, error) {
   m := metadata.New(a.DirEntry, a.Files[index])
 
   // if --artist mode, artist is set from flag
@@ -28,32 +28,33 @@ func (a *audioc) processFile(index int) (string, error) {
   // call Probe after setting m.Info.Artist
   err := m.Probe(a.Ffprobe)
   if err != nil {
-    return "", err
+    return m, err
   }
 
   // skip if sources match (unless --force)
   if m.Match && !a.Flags.Force {
-    return filepath.Dir(filepath.Join(a.DirEntry, a.Files[index])), nil
+    m.Resultpath = filepath.Dir(filepath.Join(a.DirEntry, a.Files[index]))
+    return m, nil
   }
 
   // build resulting path
-  resultPath := a.DirEntry
+  m.Resultpath = a.DirEntry
   fpa := strings.Split(a.Files[index], fsutil.PathSep)
 
   // if --collection or artist/year folder in expected place
   if a.Flags.Collection ||
     (len(fpa) > 2 && fpa[0] == m.Info.Artist && fpa[1] == m.Info.Year) {
 
-    resultPath = filepath.Join(resultPath, m.Info.Artist, m.Info.Year)
+    m.Resultpath = filepath.Join(m.Resultpath, m.Info.Artist, m.Info.Year)
   } else {
     // include innermost dir (if exists) of a.Files[index]
     if len(fpa) > 1 {
-      resultPath = filepath.Join(resultPath, fpa[0])
+      m.Resultpath = filepath.Join(m.Resultpath, fpa[0])
     }
   }
 
   // append album name as directory
-  resultPath = filepath.Join(resultPath, m.Info.ToAlbum())
+  m.Resultpath = filepath.Join(m.Resultpath, m.Info.ToAlbum())
 
   fp := filepath.Join(a.DirEntry, a.Files[index])
 
@@ -69,11 +70,11 @@ func (a *audioc) processFile(index int) (string, error) {
     // convert to mp3
     _, err := a.processMp3(fp, m.Info)
     if err != nil {
-      return "", err
+      return m, err
     }
 
     // compare processed to current path
-    newPath := filepath.Join(resultPath, m.Info.ToFile() + ".mp3")
+    newPath := filepath.Join(m.Resultpath, m.Info.ToFile() + ".mp3")
     if fp != newPath {
       p += fmt.Sprintf("  * rename to: %v\n", newPath)
     }
@@ -86,7 +87,7 @@ func (a *audioc) processFile(index int) (string, error) {
   fmt.Printf(p)
 
   // resultPath is a directory
-  return resultPath, nil
+  return m, nil
 }
 
 // skip converting if folder contains ' - FLAC'
