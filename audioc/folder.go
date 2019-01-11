@@ -43,9 +43,9 @@ func (a *audioc) processBundle(indexes []int) error {
     }
   }
 
-  // process folder via threads returning the resulting dir
+  // process folder via threads returning the resulting metadata slice
   // calls a.processFile() for each index
-  dir, err := a.processThreaded(indexes)
+  d, err := a.processThreaded(indexes)
   if err != nil {
     return err
   }
@@ -58,16 +58,18 @@ func (a *audioc) processBundle(indexes []int) error {
   // explicitly remove workdir (before folder is renamed)
   os.RemoveAll(a.Workdir)
 
+  fullResultD := filepath.Dir(filepath.Join(a.DirEntry, d[0].Resultpath))
+
   // if not same dir, rename directory to target dir
-  if fullDir != dir {
-    _, err = fsutil.MergeFolder(fullDir, dir, mergeFolderFunc)
+  if fullDir != fullResultD {
+    _, err = fsutil.MergeFolder(fullDir, fullResultD, mergeFolderFunc)
     if err != nil {
       return err
     }
   }
 
   // remove parent folder if no longer contains audio files
-  // TODO add check to ensure not removing any of DirEntry
+  // TODO fsutil.FilesAudio(parentDir) breaks when parentDir is a symlink
   parentDir := filepath.Dir(fullDir)
   if len(fsutil.FilesAudio(parentDir)) == 0 {
     err = os.RemoveAll(parentDir)
