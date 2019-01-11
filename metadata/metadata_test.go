@@ -49,7 +49,7 @@ func TestToFile(t *testing.T) {
   }
 }
 
-func TestMatchProbeTags(t *testing.T) {
+func TestMatchProbeInfo(t *testing.T) {
   tests := []struct {
     info, comb *Info
     tags *ffprobe.Tags
@@ -78,7 +78,7 @@ func TestMatchProbeTags(t *testing.T) {
   }
 
   for x := range tests {
-    rInfo, match := tests[x].info.MatchProbeTags(tests[x].tags)
+    rInfo, match := tests[x].info.MatchProbeInfo(probeTagsToInfo(tests[x].tags))
 
     if *rInfo != *tests[x].comb {
       t.Errorf("Expected %v, got %v", rInfo, tests[x].comb)
