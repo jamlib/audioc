@@ -13,7 +13,8 @@ import (
 )
 
 type Metadata struct {
-  Basepath, Filepath string
+  Basepath, Filepath, Resultpath string
+  Stripped []string
   Match bool
   Info *Info
 }
@@ -34,10 +35,26 @@ func New(basePath, filePath string) *Metadata {
 
   // info from path & file name
   dir, file := filepath.Split(m.Filepath)
-  _ = m.FromPath(dir)
+
+  // save stripped dirs to know to remove later
+  m.Stripped = m.FromPath(dir)
+
   m.FromFile(strings.TrimSuffix(file, filepath.Ext(file)))
 
   return m
+}
+
+// build info from ffprobe.Tags
+func probeTagsToInfo(p *ffprobe.Tags) *Info {
+  i := &Info{ Artist: p.Artist, Disc: p.Disc,
+    Track: p.Track, Title: p.Title }
+
+  // separate date from album
+  tmp := i.matchDate(p.Album)
+  tmp = i.matchYearOnly(tmp)
+  i.Album = fixWhitespace(tmp)
+
+  return i
 }
 
 // derive info album info from nested folder path
@@ -88,7 +105,7 @@ func (m *Metadata) Probe(ffp Ffprober) error {
   }
 
   // combine info w/ embedded tags
-  m.Info, m.Match = m.Info.MatchProbeTags(d.Format.Tags)
+  m.Info, m.Match = m.Info.MatchProbeInfo(probeTagsToInfo(d.Format.Tags))
 
   return nil
 }
@@ -126,65 +143,49 @@ func (i *Info) ToFile() string {
   return out + safeFilename(i.Title)
 }
 
-// compare file & path info against ffprobe.Tags and combine into best info
+// compare file & path info against ffprobe.Tags info and combine into best
 // return includes boolean if info sources match (no update necessary)
-func (i *Info) MatchProbeTags(p *ffprobe.Tags) (*Info, bool) {
-
-  // build info from ffprobe.Tags
-  tagInfo := &Info{
-    Artist: p.Artist,
-    Disc: p.Disc,
-    Track: p.Track,
-    Title: safeFilename(p.Title),
-  }
-
-  // separate date from album
-  a := p.Album
-  a = tagInfo.matchDate(a)
-  a = tagInfo.matchYearOnly(a)
-  tagInfo.Album = safeFilename(a)
-
+func (i *Info) MatchProbeInfo(p *Info) (*Info, bool) {
   // compare using safeFilename since info is derived from filename
-  compare := tagInfo
+  compare := p
+  compare.Album = safeFilename(compare.Album)
   compare.Title = safeFilename(compare.Title)
 
   if *i != *compare {
-    // combine infos
-    r := tagInfo
-
     // info overrides probe for Artist
-    if r.Artist != i.Artist {
-      r.Artist = i.Artist
+    if p.Artist != i.Artist {
+      p.Artist = i.Artist
     }
 
     // update Year, Month, Day, Disc, Track if not set
-    if len(r.Year) == 0 {
-      r.Year = i.Year
+    if len(p.Year) == 0 {
+      p.Year = i.Year
     }
-    if len(r.Month) == 0 {
-      r.Month = i.Month
+    if len(p.Month) == 0 {
+      p.Month = i.Month
     }
-    if len(r.Day) == 0 {
-      r.Day = i.Day
+    if len(p.Day) == 0 {
+      p.Day = i.Day
     }
-    if len(r.Disc) == 0 || regexp.MustCompile(`^\d+`).FindString(r.Disc) != r.Disc {
-      r.Disc = i.Disc
+    if len(p.Disc) == 0 || regexp.MustCompile(`^\d+`).FindString(p.Disc) != p.Disc {
+      p.Disc = i.Disc
     }
-    if len(r.Track) == 0 {
-      r.Track = i.Track
-    }
-
-    // update Album, Title if longer
-    r.Album = strings.TrimSpace(r.Album)
-    if len(r.Album) < len(i.Album) {
-      r.Album = i.Album
+    if len(p.Track) == 0 {
+      p.Track = i.Track
     }
 
-    if len(r.Title) < len(i.Title) {
-      r.Title = i.Title
+    // TODO: use album of source that derived the most info
+    p.Album = strings.TrimSpace(p.Album)
+    if len(p.Album) < len(i.Album) {
+      p.Album = i.Album
     }
 
-    return r, false
+    // use the longer title
+    if len(p.Title) < len(i.Title) {
+      p.Title = i.Title
+    }
+
+    return p, false
   }
 
   return i, true
