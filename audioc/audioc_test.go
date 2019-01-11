@@ -100,7 +100,7 @@ func TestProcessMain(t *testing.T) {
     { "2003/2003.07.17 Bonner Springs, KS/1-01 Chalk Dust Torture.flac",
       &ffprobe.Tags{},
     },{
-      "dir2/file2.mp3",
+      "cd1/file2.mp3",
       &ffprobe.Tags{
         Album: "2003.07.18 Alpine Valley, East Troy, WI",
         Track: "01", Title: "Axilla I",
@@ -122,7 +122,7 @@ func TestProcessMain(t *testing.T) {
 
   // compare relative folder path & file name with expected result
   fileResults := []string{
-    "Phish/2003.07.18 Alpine Valley, East Troy, WI/01 Axilla I.mp3",
+    "2003.07.18 Alpine Valley, East Troy, WI/01-01 Axilla I.mp3",
     "Phish/2003/2003.07.17 Bonner Springs, KS/01-01 Chalk Dust Torture.mp3",
   }
 

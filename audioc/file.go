@@ -33,28 +33,34 @@ func (a *audioc) processFile(index int) (*metadata.Metadata, error) {
 
   // skip if sources match (unless --force)
   if m.Match && !a.Flags.Force {
-    m.Resultpath = filepath.Dir(filepath.Join(a.DirEntry, a.Files[index]))
+    m.Resultpath = a.Files[index]
     return m, nil
   }
 
   // build resulting path
-  m.Resultpath = a.DirEntry
   fpa := strings.Split(a.Files[index], fsutil.PathSep)
 
   // if --collection or artist/year folder in expected place
   if a.Flags.Collection ||
     (len(fpa) > 2 && fpa[0] == m.Info.Artist && fpa[1] == m.Info.Year) {
 
-    m.Resultpath = filepath.Join(m.Resultpath, m.Info.Artist, m.Info.Year)
+    m.Resultpath = filepath.Join(m.Info.Artist, m.Info.Year)
   } else {
-    // include innermost dir (if exists) of a.Files[index]
-    if len(fpa) > 1 {
-      m.Resultpath = filepath.Join(m.Resultpath, fpa[0])
+    // strip out innermost dirs that are irrelevant (ie, cd1)
+    foundAlbum := false
+    for x := len(m.Stripped)-1; x >= 0; x-- {
+      if m.Stripped[x] != "" {
+        if foundAlbum {
+          m.Resultpath = fpa[x] + fsutil.PathSep + m.Resultpath
+        } else {
+          foundAlbum = true
+        }
+      }
     }
   }
 
   // append album name as directory
-  m.Resultpath = filepath.Join(m.Resultpath, m.Info.ToAlbum())
+  m.Resultpath = filepath.Join(m.Resultpath, m.Info.ToAlbum(), m.Info.ToFile())
 
   fp := filepath.Join(a.DirEntry, a.Files[index])
 
@@ -65,22 +71,23 @@ func (a *audioc) processFile(index int) (*metadata.Metadata, error) {
   }
 
   // convert audio (if necessary) & update tags
-  ext := strings.ToLower(filepath.Ext(fp))
+  ext := strings.ToLower(filepath.Ext(a.Files[index]))
   if ext != ".flac" || !skipConvert(a.Files[index]) {
     // convert to mp3
+    m.Resultpath += ".mp3"
     _, err := a.processMp3(fp, m.Info)
     if err != nil {
       return m, err
     }
-
-    // compare processed to current path
-    newPath := filepath.Join(m.Resultpath, m.Info.ToFile() + ".mp3")
-    if fp != newPath {
-      p += fmt.Sprintf("  * rename to: %v\n", newPath)
-    }
   } else {
     // TODO: use metaflac to edit flac metadata & embedd artwork
+    m.Resultpath += ".flac"
     p += fmt.Sprintf("\n*** Flac processing with 'metaflac' not yet implemented.\n")
+  }
+
+  // compare processed to current path
+  if a.Files[index] != m.Resultpath {
+    p += fmt.Sprintf("  * rename to: %v\n", filepath.Join(a.DirEntry, m.Resultpath))
   }
 
   // print to console all at once
