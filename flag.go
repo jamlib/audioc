@@ -25,14 +25,17 @@ audioc v%s
 
 Usage: audioc [MODE] [OPTIONS] PATH
 %s
-Mode (specify only one):
+MODE (specify only one):
+  --artist "ARTIST" --album "ALBUM"
+    treat as specific album belonging to specific artist
+
   --artist "NAME"
     treat as specific artist
 
   --collection
     treat as collection of artists
 
-Options:
+OPTIONS:
   --bitrate "BITRATE"
     V0 (default)
       convert to variable 256kbps mp3
@@ -58,6 +61,7 @@ func configFromFlags() (*audioc.Config, bool) {
   flags := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 
   // set mode
+  flags.StringVar(&c.Flags.Album, "album", "", "")
   flags.StringVar(&c.Flags.Artist, "artist", "", "")
   flags.BoolVar(&c.Flags.Collection, "collection", false, "")
 
@@ -92,9 +96,9 @@ func configFromFlags() (*audioc.Config, bool) {
     return &c, false
   }
 
-  // must specify --artist OR --collection
-  if c.Flags.Artist == "" && !c.Flags.Collection {
-    fmt.Printf("\nError: Must provide option --artist OR --collection\n")
+  // must specify proper MODE
+  if !c.Flags.Collection && c.Flags.Artist == "" {
+    fmt.Printf("\nError: Must provide a valid MODE\n")
     flags.Usage()
     return &c, false
   }
