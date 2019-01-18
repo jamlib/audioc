@@ -5,19 +5,22 @@ Clean up audio collection setting meta tags & embedding artwork
 ## Usage
 
 ```
-Usage: audioc [OPTIONS] PATH
+Usage: audioc [MODE] [OPTIONS] PATH
 
 Positional Args:
   PATH           directory path
 
-Mode (specify only one):
-  --artist "NAME"
+MODE (specify only one):
+  --artist "ARTIST" --album "ALBUM"
+    treat as specific album belonging to specific artist
+
+  --artist "ARTIST"
     treat as specific artist
 
   --collection
     treat as collection of artists
 
-Options:
+OPTIONS:
   --bitrate "BITRATE"
     V0 (default)
       convert to variable 256kbps mp3
@@ -41,7 +44,7 @@ Debug:
 
 ## Purpose
 
-This program is designed to process a music collection, keeping speficied FLAC
+This program is designed to process a music collection, keeping specified FLAC
 audio files while converting all other audio formats to MP3.
 
 Source albums have a release year or performance date. This date is then used
@@ -64,29 +67,39 @@ representing the year `1977`.
 ## Dependencies
 
 This tool depends on `ffmpeg` and `ffprobe` binaries installed or included
-within same folder, which are used to process the audio and artwork.
+within same folder, which are used to process the audio files and artwork.
+
+Information on how to download `ffmpeg`:
+[https://ffmpeg.org/download.html](https://ffmpeg.org/download.html)
 
 The `metaflac` binary needs to be installed or included to support album
-artwork embedding, but only within FLAC files. MP3 artwork embedding is
-included with `ffmpeg`.
+artwork embedding within FLAC files. If `metaflac` is not found, FLAC artwork
+embedding will be skipped, but the program will continue without error.
 
-If `metaflac` not found, FLAC embedding will be skipped, but the program will
-continue without error.
+The `metaflac` binary is part of the `flac` package.
+
+Information on how to download `flac`:
+[https://xiph.org/flac/download.html](https://xiph.org/flac/download.html)
 
 ## Mode
 
+### Album (--artist "Artist Name" --album "Album Name")
+
+Files nested within specified PATH are considered to be part of a specified
+album or live performance belonging to a specified artist.
+
 ### Artist (--artist "Artist Name")
 
-Child directories of specified PATH, as well as files within PATH itself, are
-considered to be albums or live performances belonging to the specified artist.
+Child directories of specified PATH are considered to be albums or live
+performances belonging to the specified artist.
 
 ### Collection (--collection)
 
-Immediate child directories of specified PATH are considered to be artists.
-Child directories of each artist are considered to be albums or live
-performances belonging to that artist.
+Child directories of specified PATH are considered to be artists. Child
+directories of each artist are considered to be albums or live performances
+belonging to that artist.
 
-In the event that the artist tag is not found, the artist folder name is used.
+The artist folder name overrides the audio file embedded artist metadata.
 
 To skip processing a child directory, include ` - ` in its name. Such as:
 `Grateful Dead - UNORGANIZED`
@@ -98,29 +111,31 @@ To skip processing a child directory, include ` - ` in its name. Such as:
 Convert other audio formats to MP3 using `libmp3lame` encoding and either V0
 (variable 256kbps) or 320 (constant 320kbps) bitrate.
 
-To skip converting FLAC audio, include ` - FLAC` at the end of the album folder
-name.
+To skip converting FLAC audio to MP3, include ` - FLAC` at the end of the album
+folder name.
 
 ### Fix (--fix)
 
-Fixes incorrect track length (ie, 1035:36:51) by removing all metadata, then
-adding metadata back in separate process.
+Fixes incorrect track length (ie, 1035:36:51) affecting certain variable MP3
+encodes by removing all metadata, then adding minimal metadata back in a
+separate process.
 
 ### Force (--force)
 
-Processes each audio file regardless of whether or not the path info matches
-tag info.
+Processes each audio file regardless of whether or not the path and file info
+matches its tag info.
 
 ### Write (--write)
 
 By not including `--write`, the process will run in simulation, printing all
 changes to the console for review.
 
-Including `--write` will apply changes to disk.
+Including `--write` will apply changes by writing to disk. This process cannot
+be undone.
 
 ## Developing
 
-[Install Go and Dep](docs/INSTALL_GO_DEP.md).
+Instructions on how to: [Install Go and Dep](docs/INSTALL_GO_DEP.md)
 
 ### Building
 
@@ -152,7 +167,7 @@ From within source path, run:
 
 ### Contributing
 
-[Submit a Pull Request](docs/SUBMIT_PR.md).
+Instructions on how to: [Submit a Pull Request](docs/SUBMIT_PR.md)
 
 ## License
 
