@@ -19,23 +19,20 @@ import (
 func (a *audioc) processBundle(indexes []int) error {
   fullDir := filepath.Dir(filepath.Join(a.DirEntry, a.Files[indexes[0]]))
 
-  // skip if possible (unless --force)
-  if !a.Flags.Force && a.skipFolder(a.DirEntry, a.Files[indexes[0]]) {
+  // skip folder if possible (unless --force) by checking first audio file
+  if !a.Flags.Force && a.skipFolder(a.Files[indexes[0]]) {
     return nil
   }
 
   fmt.Printf("\nProcessing: %v ...\n", fullDir)
 
-  // reset image on each folder
-  a.Image = ""
+  // process artwork once per folder
+  err := a.processArtwork(a.Files[indexes[0]])
+  if err != nil {
+    return err
+  }
 
   if a.Flags.Write {
-    // process artwork once per folder
-    err := a.processArtwork(a.Files[indexes[0]])
-    if err != nil {
-      return err
-    }
-
     // create new random workdir within current path
     a.Workdir, err = ioutil.TempDir(fullDir, "")
     if err != nil {
@@ -44,7 +41,8 @@ func (a *audioc) processBundle(indexes []int) error {
   }
 
   // process folder via threads returning the resulting metadata slice
-  // calls a.processFile() for each index
+  // a.processThreaded found within audioc/thread.go
+  // a.processFile is called for each index and found within audioc/file.go
   d, err := a.processThreaded(indexes)
   if err != nil {
     return err
@@ -83,7 +81,7 @@ func (a *audioc) processBundle(indexes []int) error {
 
 // helper to determine if bundle should be skipped by analyzing the
 // first audio files album folder
-func (a *audioc) skipFolder(base, path string) bool {
+func (a *audioc) skipFolder(path string) bool {
   pa := strings.Split(path, fsutil.PathSep)
 
   // determine which folder in path is the album name
@@ -106,10 +104,17 @@ func (a *audioc) skipFolder(base, path string) bool {
 
   // true if album folder matches metadata.ToAlbum
   if len(alb) > 0 {
-    m := metadata.New("", alb + fsutil.PathSep + "1.mp3")
-
-    if m.Info.ToAlbum() == alb {
-      return true
+    if a.Flags.Album != "" {
+      // if --album matches album folder
+      if a.Flags.Album == alb {
+        return true
+      }
+    } else {
+      // derive metadata from album folder and see if it matches
+      m := metadata.New("", alb)
+      if m.Info.ToAlbum() == alb {
+        return true
+      }
     }
   }
 
@@ -123,7 +128,12 @@ func (a *audioc) processArtwork(file string) error {
     Fullpath: filepath.Join(a.DirEntry, file) }
 
   var err error
-  a.Image, err = albumart.Process(art)
+  a.Image = ""
+
+  if a.Flags.Write {
+    a.Image, err = albumart.Process(art)
+  }
+
   return err
 }
 
