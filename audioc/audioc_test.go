@@ -11,41 +11,66 @@ import (
   "github.com/jamlib/libaudio/fsutil"
 )
 
-func TestSkipArtistOnCollection(t *testing.T) {
+func TestSkipFolderOnCollection(t *testing.T) {
   tests := []struct {
-    base, path string
+    path string
     col, skip bool
   }{
-    { base: "/", path: "Jerry Garcia Band/1.mp3", col: true, skip: false },
-    { base: "/", path: "Grateful Dead - Unorganized/Album1/1.mp3", col: true, skip: true },
-    { base: "/", path: "Grateful Dead - Unorganized/1.mp3", col: false, skip: true },
+    // false: missing album folder
+    { path: "Jerry Garcia Band/1.mp3", col: true, skip: false },
+    // true: artist folder includes ' - '
+    { path: "Grateful Dead - Unorganized/Album1/1.mp3", col: true, skip: true },
+    // true: artist, year, album folder all exist and match
+    { path: "Phish/2003/2003.07.09 Shoreline Amphitheatre, Mountain View, CA/1.mp3", col: true, skip: true },
   }
 
   for i := range tests {
     a := &audioc{ Flags: flags{ Collection: tests[i].col } }
 
-    r := a.skipFolder(tests[i].base, tests[i].path)
+    r := a.skipFolder(tests[i].path)
     if r != tests[i].skip {
-      t.Errorf("%v: Expected %v, got %v", tests[i].base+tests[i].path, tests[i].skip, r)
+      t.Errorf("%v: Expected %v, got %v", tests[i].path, tests[i].skip, r)
     }
   }
 }
 
-func TestSkipFolder(t *testing.T) {
+func TestSkipFolderOnArtist(t *testing.T) {
   tests := []struct {
-    base, path string
-    col, skip bool
+    path, artist string
+    skip bool
   }{
-    { base: "/", path: "Random Dir/1.mp3", col: false, skip: true },
-    { base: "/", path: "Phish/2003/2003.07.09 Shoreline Amphitheatre, Mountain View, CA/1.mp3", col: true, skip: true },
+    // true: album folder equals derived
+    { path: "Grateful Dead - Unorganized/1.mp3", artist: "Grateful Dead", skip: true },
+    { path: "Random Dir/1.mp3", artist: "Anyone", skip: true },
   }
 
   for i := range tests {
-    a := &audioc{ Flags: flags{ Collection: tests[i].col } }
+    a := &audioc{ Flags: flags{ Artist: tests[i].artist } }
 
-    r := a.skipFolder(tests[i].base, tests[i].path)
+    r := a.skipFolder(tests[i].path)
     if r != tests[i].skip {
-      t.Errorf("%v: Expected %v, got %v", tests[i].base+tests[i].path, tests[i].skip, r)
+      t.Errorf("%v: Expected %v, got %v", tests[i].path, tests[i].skip, r)
+    }
+  }
+}
+
+func TestSkipFolderOnAlbum(t *testing.T) {
+  tests := []struct {
+    path, album string
+    skip bool
+  }{
+    // true: album folder equals specified
+    { path: "1980 Go To Heaven/1.mp3", album: "1980 Go To Heaven", skip: true },
+    // false: album folder does not equal specified
+    { path: "1980 Go To Heaven/1.mp3", album: "Go To Heaven", skip: false },
+  }
+
+  for i := range tests {
+    a := &audioc{ Flags: flags{ Artist: "Whoever", Album: tests[i].album } }
+
+    r := a.skipFolder(tests[i].path)
+    if r != tests[i].skip {
+      t.Errorf("%v: Expected %v, got %v", tests[i].path, tests[i].skip, r)
     }
   }
 }
