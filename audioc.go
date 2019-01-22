@@ -25,6 +25,7 @@ func main() {
     log.Fatal(err)
   }
 
+  // audioc.New & a.Process found within audioc/audioc.go
   a := audioc.New(c, ffm, ffp)
 
   err = a.Process()

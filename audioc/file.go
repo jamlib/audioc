@@ -20,9 +20,14 @@ func (a *audioc) processFile(index int) (*metadata.Metadata, error) {
     m.Info.Artist = a.Flags.Artist
   }
 
-  // if --colleciton mode, artist set from parent folder name
+  // if --collection mode, artist set from parent folder name
   if a.Flags.Collection {
     m.Info.Artist = strings.Split(a.Files[index], fsutil.PathSep)[0]
+  }
+
+  // if --album mode, album is set from flag
+  if a.Flags.Album != "" {
+    m.Info.Album = m.Info.MatchCleanAlbum(a.Flags.Album)
   }
 
   // call Probe after setting m.Info.Artist
@@ -75,6 +80,8 @@ func (a *audioc) processFile(index int) (*metadata.Metadata, error) {
   if ext != ".flac" || !skipConvert(a.Files[index]) {
     // convert to mp3
     m.Resultpath += ".mp3"
+    p += fmt.Sprintf("  * convert to MP3 (%s)\n", a.Flags.Bitrate)
+
     _, err := a.processMp3(fp, m.Info)
     if err != nil {
       return m, err

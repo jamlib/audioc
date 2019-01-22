@@ -17,20 +17,15 @@ import (
 
 // process each bundle or folder of audio files
 func (a *audioc) processBundle(indexes []int) error {
+  var err error
   fullDir := filepath.Dir(filepath.Join(a.DirEntry, a.Files[indexes[0]]))
 
-  // skip folder if possible (unless --force) by checking first audio file
+  // skip folder if possible (unless --force)
   if !a.Flags.Force && a.skipFolder(a.Files[indexes[0]]) {
     return nil
   }
 
   fmt.Printf("\nProcessing: %v ...\n", fullDir)
-
-  // process artwork once per folder
-  err := a.processArtwork(a.Files[indexes[0]])
-  if err != nil {
-    return err
-  }
 
   if a.Flags.Write {
     // create new random workdir within current path
@@ -40,39 +35,45 @@ func (a *audioc) processBundle(indexes []int) error {
     }
   }
 
-  // process folder via threads returning the resulting metadata slice
-  // a.processThreaded found within audioc/thread.go
-  // a.processFile is called for each index and found within audioc/file.go
-  d, err := a.processThreaded(indexes)
+  // process artwork once per folder
+  err = a.processArtwork(a.Files[indexes[0]])
   if err != nil {
     return err
   }
 
-  // return here unless writing
-  if !a.Flags.Write {
-    return nil
+  // process folder via threads returning the resulting metadata slice
+  // a.processThreaded (thread.go) calls a.processFile(file.go) for each index
+  mdSlice, err := a.processThreaded(indexes)
+  if err != nil {
+    return err
   }
 
-  // explicitly remove workdir (before folder is renamed)
-  os.RemoveAll(a.Workdir)
+  if a.Flags.Write {
+    // explicitly remove workdir (before folder is possibly renamed)
+    os.RemoveAll(a.Workdir)
 
-  fullResultD := filepath.Dir(filepath.Join(a.DirEntry, d[0].Resultpath))
+    // TODO: iterate through mdSlice moving each file individually instead of
+    // assuming all belong to same resulting directory
+    fullResultD := filepath.Dir(filepath.Join(a.DirEntry, mdSlice[0].Resultpath))
 
-  // if not same dir, rename directory to target dir
-  if fullDir != fullResultD {
-    _, err = fsutil.MergeFolder(fullDir, fullResultD, mergeFolderFunc)
-    if err != nil {
-      return err
+    // if not same dir, rename directory to target dir
+    if fullDir != fullResultD {
+      _, err = fsutil.MergeFolder(fullDir, fullResultD, mergeFolderFunc)
+      if err != nil {
+        return err
+      }
     }
-  }
 
-  // remove parent folder if no longer contains audio files
-  // TODO fsutil.FilesAudio(parentDir) breaks when parentDir is a symlink
-  parentDir := filepath.Dir(fullDir)
-  if len(fsutil.FilesAudio(parentDir)) == 0 {
-    err = os.RemoveAll(parentDir)
-    if err != nil {
-      return err
+    // remove parent folder if no longer contains audio files
+    parentDir := filepath.Dir(fullDir)
+    if info, err := os.Stat(parentDir); err == nil && info.IsDir() {
+      if len(fsutil.FilesAudio(parentDir)) == 0 {
+        // is a directory (not symlink) and contains no audio files
+        err = os.RemoveAll(parentDir)
+        if err != nil {
+          return err
+        }
+      }
     }
   }
 
@@ -137,9 +138,12 @@ func (a *audioc) processArtwork(file string) error {
   return err
 }
 
-// passed to fsutil.MergeFolder
+// passed to fsutil.MergeFolder, this only merges files into the same folder
+// if the disc and track number don't already exist in a current file, else it
+// creates an equivalent folder with (1) appended to end, copying conflicting
+// files to this location. {Info.title} is currently not used, only disc/track.
 func mergeFolderFunc(f string) (int, string) {
-  // parse disc & track from filename
+  // use metadata to obtain info from filename
   m := metadata.New("", f)
 
   disc, _ := strconv.Atoi(regexp.MustCompile(`^\d+`).FindString(m.Info.Disc))
