@@ -33,13 +33,18 @@ type Ffprober interface {
 func New(basePath, filePath string) *Metadata {
   m := &Metadata{ Basepath: basePath, Filepath: filePath, Info: &Info{} }
 
-  // info from path & file name
-  dir, file := filepath.Split(m.Filepath)
+  // keep track of whether filePath is folder or file
+  dir := filePath
 
-  // save stripped dirs to know to remove later
+  // derive file info if has file extension
+  if regexp.MustCompile(`\.[A-Za-z0-9]{1,5}$`).FindString(filePath) != "" {
+    dir = filepath.Dir(dir)
+    file := filepath.Base(filePath)
+    m.FromFile(strings.TrimSuffix(file, filepath.Ext(file)))
+  }
+
+  // derive path info & save stripped dirs to know to remove later
   m.Stripped = m.FromPath(dir)
-
-  m.FromFile(strings.TrimSuffix(file, filepath.Ext(file)))
 
   return m
 }
@@ -49,11 +54,7 @@ func probeTagsToInfo(p *ffprobe.Tags) *Info {
   i := &Info{ Artist: p.Artist, Disc: p.Disc,
     Track: p.Track, Title: p.Title }
 
-  // separate date from album
-  tmp := i.matchDate(p.Album)
-  tmp = i.matchYearOnly(tmp)
-  i.Album = fixWhitespace(tmp)
-
+  i.Album = i.MatchCleanAlbum(p.Album)
   return i
 }
 
@@ -63,10 +64,7 @@ func (m *Metadata) FromPath(p string) []string {
 
   // start inner-most folder, work out
   for x := len(sa)-1; x >= 0; x-- {
-    // determine Disc, Year, Month, Day, Album
-    sa[x] = m.Info.matchDiscOnly(sa[x])
-    sa[x] = m.Info.matchDate(sa[x])
-    sa[x] = m.Info.matchYearOnly(sa[x])
+    sa[x] = m.Info.MatchCleanAlbum(sa[x])
 
     // only overwrite album if not yet set
     if len(m.Info.Album) == 0 {
@@ -108,6 +106,13 @@ func (m *Metadata) Probe(ffp Ffprober) error {
   m.Info, m.Match = m.Info.MatchProbeInfo(probeTagsToInfo(d.Format.Tags))
 
   return nil
+}
+
+func (i *Info) MatchCleanAlbum(s string) string {
+  s = i.matchDiscOnly(s)
+  s = i.matchDate(s)
+  s = i.matchYearOnly(s)
+  return fixWhitespace(s)
 }
 
 // returns album prefixed with fulldate, year, or nothing (if no year)
@@ -349,36 +354,36 @@ func regexpMatch(s, regExpStr string) ([]string, string) {
   return m, s
 }
 
+var albumTitleRemoveRegexps = []string{
+  // from end: remove [*] from end where * is wildcard
+  `\s*\[[^\[\]]*\]\s*$`,
+  // anywhere: only these chars allowed: A-Za-z0-9-',.!?&> _()
+  `[^A-Za-z0-9-',.!?&> _()]+`,
+  // anywhere: remove () (1) ( )
+  `\s*\({1}[\d\s]*\){1}\s*`,
+  // from end: remove file extension
+  `\s*-*\s*(?i)(flac|m4a|mp3|mp4|shn|wav)$`,
+  // from end: remove bitrate/sbd
+  `\s*-*\s*(?i)(128|192|256|320|sbd)$`,
+  // from beginning: remove anything except A-Za-z0-9(
+  `^[-',.&>_)!?]+`,
+  // from end: remove anything except A-Za-z0-9)?!
+  `[-',.&>_(]+$`,
+}
+
 func matchAlbumOrTitle(s string) string {
   // replace / or \ with -
   s = regexp.MustCompile(`[\/\\]+`).ReplaceAllString(s, "-")
 
-  // remove [*] from end where * is wildcard
-  s = regexp.MustCompile(`\s*\[[^\[\]]*\]\s*$`).ReplaceAllString(s, "")
-
-  // only these chars allowed: A-Za-z0-9-',.!?&> _()
-  s = regexp.MustCompile(`[^A-Za-z0-9-',.!?&> _()]+`).ReplaceAllString(s, "")
-
-  // remove () (1)
-  s = regexp.MustCompile(`\s*\({1}[\d\s]*\){1}\s*`).ReplaceAllString(s, "")
-  s = fixWhitespace(s)
-
-  // remove file extension from end
-  s = regexp.MustCompile(`\s*-*\s*(?i)(flac|m4a|mp3|mp4|shn|wav)$`).ReplaceAllString(s, "")
-
-  // remove bitrate/sbd from end
-  s = regexp.MustCompile(`\s*-*\s*(?i)(128|192|256|320|sbd)$`).ReplaceAllString(s, "")
-
-  // from beginning: remove anything except A-Za-z0-9(
-  s = regexp.MustCompile(`^[-',.&>_)!?]+`).ReplaceAllString(s, "")
-
-  // from end: remove anything except A-Za-z0-9)?!
-  s = regexp.MustCompile(`[-',.&>_(]+$`).ReplaceAllString(s, "")
+  // replace various matches with blank string
+  for _, regExpStr := range albumTitleRemoveRegexps {
+    s = regexp.MustCompile(regExpStr).ReplaceAllString(s, "")
+  }
 
   // replace _ with space
   s = regexp.MustCompile(`[_]+`).ReplaceAllString(s, " ")
 
-  return fixWhitespace(safeFilename(s))
+  return fixWhitespace(s)
 }
 
 // replace whitespaces with one space
