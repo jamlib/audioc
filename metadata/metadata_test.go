@@ -110,10 +110,10 @@ func TestInfoFromFile(t *testing.T) {
 func TestInfoFromPath(t *testing.T) {
   tests := [][][]string{
     {
-      { "Jerry Garcia Band/1980/1980.02.28 Kean College After Midnight - FLAC/1.mp3" },
+      { "Jerry Garcia Band/1980/1980.02.28 Kean College After Midnight - FLAC" },
       { "1980", "02", "28", "Kean College After Midnight" },
     },{
-      { "Grateful Dead/1975/1975 Blues For Allah/1.mp3" }, { "1975", "", "", "Blues For Allah" },
+      { "Grateful Dead/1975/1975 Blues For Allah" }, { "1975", "", "", "Blues For Allah" },
     },
   }
 
