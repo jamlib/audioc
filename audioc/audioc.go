@@ -30,7 +30,7 @@ type audioc struct {
 }
 
 type flags struct {
-  Artist, Bitrate string
+  Artist, Album, Bitrate string
   Collection, Fix, Force, Version, Write bool
 }
 
@@ -65,7 +65,8 @@ func (a *audioc) Process() error {
     }
   }
 
-  // group files by parent directory; call a.processBundle()
+  // group files by parent directory; call a.processBundle
+  // a.processBundle found within audioc/folder.go
   err = fsutil.BundleFiles(a.DirEntry, a.Files, a.processBundle)
   if err != nil {
     return err
