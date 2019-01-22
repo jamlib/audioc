@@ -66,7 +66,7 @@ func (a *audioc) Process() error {
   }
 
   // group files by parent directory; call a.processBundle
-  // a.processBundle found within audioc/folder.go
+  // a.processBundle found within bundle.go
   err = fsutil.BundleFiles(a.DirEntry, a.Files, a.processBundle)
   if err != nil {
     return err

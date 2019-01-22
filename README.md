@@ -69,7 +69,7 @@ representing the year `1977`.
 This tool depends on `ffmpeg` and `ffprobe` binaries installed or included
 within same folder, which are used to process the audio files and artwork.
 
-Information on how to download `ffmpeg`:
+To download `ffmpeg`:
 [https://ffmpeg.org/download.html](https://ffmpeg.org/download.html)
 
 The `metaflac` binary needs to be installed or included to support album
@@ -78,7 +78,7 @@ embedding will be skipped, but the program will continue without error.
 
 The `metaflac` binary is part of the `flac` package.
 
-Information on how to download `flac`:
+To download `flac`:
 [https://xiph.org/flac/download.html](https://xiph.org/flac/download.html)
 
 ## Mode
@@ -135,7 +135,7 @@ be undone.
 
 ## Developing
 
-Instructions on how to: [Install Go and Dep](docs/INSTALL_GO_DEP.md)
+How to: [Install Go and Dep](docs/INSTALL_GO_DEP.md)
 
 ### Building
 
@@ -153,7 +153,11 @@ Ensure dependencies are installed and up-to-date with `dep`, run:
 
 From within source path, to build the binary, run:
 
-    go install
+    go build -o audioc cmd/*.go
+
+To install the binary, run:
+
+    go build -o $GOPATH/bin/audioc cmd/*.go
 
 To test by displaying usage, run:
 
@@ -167,7 +171,7 @@ From within source path, run:
 
 ### Contributing
 
-Instructions on how to: [Submit a Pull Request](docs/SUBMIT_PR.md)
+How to: [Submit a Pull Request](docs/SUBMIT_PR.md)
 
 ## License
 
