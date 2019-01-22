@@ -6,7 +6,7 @@ import (
   "flag"
   "path/filepath"
 
-  "github.com/jamlib/audioc/audioc"
+  "github.com/jamlib/audioc"
 )
 
 const (
