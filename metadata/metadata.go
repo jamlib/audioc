@@ -13,7 +13,7 @@ import (
 )
 
 type Metadata struct {
-  Basepath, Filepath, Resultpath string
+  Filepath, Resultpath string
   Stripped []string
   Match bool
   Info *Info
@@ -30,21 +30,28 @@ type Ffprober interface {
 }
 
 // filePath used to derive info
-func New(basePath, filePath string) *Metadata {
-  m := &Metadata{ Basepath: basePath, Filepath: filePath, Info: &Info{} }
+func New(filePath string, i *Info) *Metadata {
+  // create info if not passed as arg
+  if i == nil {
+    i = &Info{}
+  }
 
-  // keep track of whether filePath is folder or file
-  dir := filePath
+  // create new metadata
+  var file string
+  m := &Metadata{ Filepath: filePath, Info: i }
 
   // derive file info if has file extension
   if regexp.MustCompile(`\.[A-Za-z0-9]{1,5}$`).FindString(filePath) != "" {
-    dir = filepath.Dir(dir)
-    file := filepath.Base(filePath)
-    m.FromFile(strings.TrimSuffix(file, filepath.Ext(file)))
+    file = filepath.Base(filePath)
+    filePath = filepath.Dir(filePath)
   }
 
   // derive path info & save stripped dirs to know to remove later
-  m.Stripped = m.FromPath(dir)
+  m.Stripped = m.FromPath(filePath)
+
+  if len(file) > 0 {
+    m.FromFile(fixWhitespace(strings.TrimSuffix(file, filepath.Ext(file))))
+  }
 
   return m
 }
@@ -77,22 +84,27 @@ func (m *Metadata) FromPath(p string) []string {
 
 // determine Disc, Year, Month, Day, Track, Title from file string
 func (m *Metadata) FromFile(s string) {
-  strs := []string{m.Info.Artist, m.Info.Album}
+  // match and remove date from anywhere within string
+  s = m.Info.matchDate(s)
 
-  // trim slice of prefixes w/ multiple separator variations
+  // attempt to remove artist or album prefixes
+  strs := []string{m.Info.Artist, m.Info.Album}
+  vars := []string{" - ", " ", "-"}
+
   for x := range strs {
-    s = strings.TrimLeft(s, strs[x] + " - ")
-    s = strings.TrimLeft(s, strs[x] + "-")
+    for y := range vars {
+      s = strings.TrimPrefix(s, strs[x] + vars[y])
+    }
   }
 
-  s = m.Info.matchDate(s)
+  // match disc, track number, title
   s = m.Info.matchDiscTrack(s)
   m.Info.Title = matchAlbumOrTitle(s)
 }
 
-func (m *Metadata) Probe(ffp Ffprober) error {
+func (m *Metadata) Probe(ffp Ffprober, fp string) error {
   // info from embedded tags within audio file
-  d, err := ffp.GetData(filepath.Join(m.Basepath, m.Filepath))
+  d, err := ffp.GetData(fp)
   if err != nil {
     return err
   }
@@ -270,7 +282,7 @@ func (i *Info) matchDate(s string) string {
     if len(i.Year) == 0 || len(i.Month) == 0 || len(i.Day) == 0 {
       i.Year, i.Month, i.Day = year, mon, day
     }
-    return remain
+    return strings.TrimSpace(remain)
   }
   return s
 }
