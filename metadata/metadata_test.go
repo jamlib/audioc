@@ -98,7 +98,7 @@ func TestInfoFromFile(t *testing.T) {
   }
 
   for x := range tests {
-    m := New("", tests[x][0][0])
+    m := New(tests[x][0][0], nil)
     compare := []string{ m.Info.Year, m.Info.Month, m.Info.Day,
       m.Info.Disc, m.Info.Track, m.Info.Title }
     if strings.Join(compare, "\n") != strings.Join(tests[x][1], "\n") {
@@ -118,7 +118,7 @@ func TestInfoFromPath(t *testing.T) {
   }
 
   for x := range tests {
-    m := New("", tests[x][0][0])
+    m := New(tests[x][0][0], nil)
     compare := []string{ m.Info.Year, m.Info.Month, m.Info.Day, m.Info.Album }
     if strings.Join(compare, "\n") != strings.Join(tests[x][1], "\n") {
       t.Errorf("Expected %v, got %v", tests[x][1], compare)
@@ -167,12 +167,12 @@ func TestMatchYearOnly(t *testing.T) {
 func TestMatchDate(t *testing.T) {
   tests := [][][]string{
     { { "not a date" }, { "", "", "", "not a date" } },
-    { { "2000.01.01 Venue, City" }, { "2000", "01", "01", " Venue, City" } },
+    { { "2000.01.01 Venue, City" }, { "2000", "01", "01", "Venue, City" } },
     { { "2000/1/01INFO" }, { "2000", "01", "01", "INFO" } },
     { { "2000-1-1" }, { "2000", "01", "01", "" } },
-    { { "2000.01.31,01 Title" }, { "2000", "01", "31,01", " Title" } },
-    { { "2000.01.01-03 Title" }, { "2000", "01", "01-03", " Title" } },
-    { { "98-08-23 Title" }, { "1998", "08", "23", " Title" } },
+    { { "2000.01.31,01 Title" }, { "2000", "01", "31,01", "Title" } },
+    { { "2000.01.01-03 Title" }, { "2000", "01", "01-03", "Title" } },
+    { { "98-08-23 Title" }, { "1998", "08", "23", "Title" } },
     { { "5-6-22" }, { "1922", "05", "06", "" } },
     { { "sci160318d1_01_Shine" }, { "2016", "03", "18", "d1_01_Shine" } },
     { { "jgb1980-02-28d1t1 Sugaree" }, { "1980", "02", "28", "d1t1 Sugaree" } },
