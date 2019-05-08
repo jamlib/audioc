@@ -13,25 +13,27 @@ import (
 )
 
 func (a *audioc) processFile(index int) (*metadata.Metadata, error) {
-  m := metadata.New(a.DirEntry, a.Files[index])
+  i := &metadata.Info{}
 
   // if --artist mode, artist is set from flag
   if a.Flags.Artist != "" {
-    m.Info.Artist = a.Flags.Artist
+    i.Artist = a.Flags.Artist
   }
 
   // if --collection mode, artist set from parent folder name
   if a.Flags.Collection {
-    m.Info.Artist = strings.Split(a.Files[index], fsutil.PathSep)[0]
+    i.Artist = strings.Split(a.Files[index], fsutil.PathSep)[0]
   }
 
   // if --album mode, album is set from flag
   if a.Flags.Album != "" {
-    m.Info.Album = m.Info.MatchCleanAlbum(a.Flags.Album)
+    i.Album = i.MatchCleanAlbum(a.Flags.Album)
   }
 
+  m := metadata.New(a.Files[index], i)
+
   // call Probe after setting m.Info.Artist
-  err := m.Probe(a.Ffprobe)
+  err := m.Probe(a.Ffprobe, filepath.Join(a.DirEntry, a.Files[index]))
   if err != nil {
     return m, err
   }
