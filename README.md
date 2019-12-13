@@ -135,21 +135,37 @@ be undone.
 
 ## Developing
 
-How to: [Install Go and Dep](docs/INSTALL_GO_DEP.md)
+### Install / Update Go on Linux
+
+Download latest go binary from [golang.org/dl](https://golang.org/dl/). In this case, version `1.13.5`.
+
+Remove any existing installation, run:
+
+    if [ -d /usr/local/go ]; then sudo rm -r /usr/local/go; fi
+
+Extract to `/usr/local`, run:
+
+    sudo tar -C /usr/local -xzf go1.13.5.linux-amd64.tar.gz
+
+Create go home dir if doesn't already exist, run:
+
+    if [ ! -d $HOME/go ]; then mkdir $HOME/go; fi
+
+Edit `~/.profile`, run:
+
+    nano ~/.profile
+
+Append the following, then save/exit:
+
+    export PATH=$PATH:/usr/local/go/bin
+    export GOPATH=$(go env GOPATH)
+    export PATH=$PATH:$GOPATH/bin
+
+Source updated profile, run:
+
+    source ~/.profile
 
 ### Building
-
-Get latest source, run:
-
-    go get github.com/jamlib/audioc
-
-Navigate to source path, run:
-
-    cd $GOPATH/src/github.com/jamlib/audioc
-
-Ensure dependencies are installed and up-to-date with `dep`, run:
-
-    dep ensure
 
 From within source path, to build the binary, run:
 
@@ -171,7 +187,19 @@ From within source path, run:
 
 ### Contributing
 
-How to: [Submit a Pull Request](docs/SUBMIT_PR.md)
+Fork repo on Github.
+
+From within source path, setup new remote, run:
+
+    git remote add myfork git@github.com:$GITHUB-USERNAME/audioc.git
+
+Create a new branch to use for development, run:
+
+    git checkout -b new-branch
+
+Make your changes, add, commit and push to your Github fork.
+
+Back on Github, submit pull request.
 
 ## License
 
