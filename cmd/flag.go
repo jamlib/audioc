@@ -61,18 +61,19 @@ func configFromFlags() (*audioc.Config, bool) {
   flags := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 
   // set mode
-  flags.StringVar(&c.Flags.Album, "album", "", "")
-  flags.StringVar(&c.Flags.Artist, "artist", "", "")
-  flags.BoolVar(&c.Flags.Collection, "collection", false, "")
+  flags.StringVar(&c.Album, "album", "", "")
+  flags.StringVar(&c.Artist, "artist", "", "")
+  flags.BoolVar(&c.Collection, "collection", false, "")
 
   // set options
-  flags.StringVar(&c.Flags.Bitrate, "bitrate", "V0", "")
-  flags.BoolVar(&c.Flags.Fix, "fix", false, "")
-  flags.BoolVar(&c.Flags.Force, "force", false, "")
-  flags.BoolVar(&c.Flags.Write, "write", false, "")
+  flags.StringVar(&c.Bitrate, "bitrate", "V0", "")
+  flags.BoolVar(&c.Fix, "fix", false, "")
+  flags.BoolVar(&c.Force, "force", false, "")
+  flags.BoolVar(&c.Write, "write", false, "")
 
   // set debug options
-  flags.BoolVar(&c.Flags.Version, "version", false, "")
+  var printVersion bool
+  flags.BoolVar(&printVersion, "version", false, "")
 
   // create --help closure
   flags.Usage = func() {
@@ -85,7 +86,7 @@ func configFromFlags() (*audioc.Config, bool) {
   a := flags.Args()
 
   // --version
-  if c.Flags.Version {
+  if printVersion {
     fmt.Printf("%s\n", version)
     return &c, false
   }
@@ -97,17 +98,17 @@ func configFromFlags() (*audioc.Config, bool) {
   }
 
   // must specify proper MODE
-  if !c.Flags.Collection && c.Flags.Artist == "" {
+  if !c.Collection && c.Artist == "" {
     fmt.Printf("\nError: Must provide a valid MODE\n")
     flags.Usage()
     return &c, false
   }
 
   // default to V0 unless 320 specified
-  if c.Flags.Bitrate != "320" {
-    c.Flags.Bitrate = "V0"
+  if c.Bitrate != "320" {
+    c.Bitrate = "V0"
   }
 
-  c.DirEntry = filepath.Clean(a[0])
+  c.Dir = filepath.Clean(a[0])
   return &c, true
 }

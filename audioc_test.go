@@ -25,7 +25,7 @@ func TestSkipFolderOnCollection(t *testing.T) {
   }
 
   for i := range tests {
-    a := &audioc{ Flags: flags{ Collection: tests[i].col } }
+    a := &audioc{ Config: &Config{ Collection: tests[i].col } }
 
     r := a.skipFolder(tests[i].path)
     if r != tests[i].skip {
@@ -45,7 +45,7 @@ func TestSkipFolderOnArtist(t *testing.T) {
   }
 
   for i := range tests {
-    a := &audioc{ Flags: flags{ Artist: tests[i].artist } }
+    a := &audioc{ Config: &Config{ Artist: tests[i].artist } }
 
     r := a.skipFolder(tests[i].path)
     if r != tests[i].skip {
@@ -66,7 +66,7 @@ func TestSkipFolderOnAlbum(t *testing.T) {
   }
 
   for i := range tests {
-    a := &audioc{ Flags: flags{ Artist: "Whoever", Album: tests[i].album } }
+    a := &audioc{ Config: &Config{ Artist: "Whoever", Album: tests[i].album } }
 
     r := a.skipFolder(tests[i].path)
     if r != tests[i].skip {
@@ -76,7 +76,7 @@ func TestSkipFolderOnAlbum(t *testing.T) {
 }
 
 func TestProcessDirDNE(t *testing.T) {
-  a := &audioc{ DirEntry: "audioc-dir-def-dne" }
+  a := &audioc{ Config: &Config{ Dir: "audioc-dir-def-dne" } }
   err := a.Process()
   if err == nil {
     t.Errorf("Expected error, got none.")
@@ -96,8 +96,8 @@ func createTestProcessFiles(t *testing.T, entryDir string,
     t.Errorf("Expected entryDir")
   }
 
-  a := &audioc{ Ffmpeg: &ffmpeg.MockFfmpeg{}, Ffprobe: &ffprobe.MockFfprobe{},
-    Files: []string{}, Workers: 1 }
+  a := &audioc{ Config: &Config{}, Ffmpeg: &ffmpeg.MockFfmpeg{},
+    Ffprobe: &ffprobe.MockFfprobe{}, Files: []string{}, Workers: 1 }
 
   indexes := []int{}
   createFiles := []*fsutil.TestFile{}
@@ -113,8 +113,8 @@ func createTestProcessFiles(t *testing.T, entryDir string,
     createFiles = append(createFiles, &fsutil.TestFile{nestedPath, string(b)})
   }
 
-  a.DirEntry, _ = fsutil.CreateTestFiles(t, createFiles)
-  a.DirEntry += fsutil.PathSep + entryDir
+  a.Config.Dir, _ = fsutil.CreateTestFiles(t, createFiles)
+  a.Config.Dir += fsutil.PathSep + entryDir
 
   return a, indexes
 }
@@ -132,11 +132,11 @@ func TestProcessMain(t *testing.T) {
       },
     },
   })
-  defer os.RemoveAll(filepath.Dir(a.DirEntry))
+  defer os.RemoveAll(filepath.Dir(a.Config.Dir))
 
-  a.Flags.Artist = "Phish"
-  a.Flags.Write = true
-  a.Flags.Force = true
+  a.Config.Artist = "Phish"
+  a.Config.Write = true
+  a.Config.Force = true
 
   err := a.Process()
 
@@ -151,7 +151,7 @@ func TestProcessMain(t *testing.T) {
     "Phish/2003/2003.07.17 Bonner Springs, KS/01-01 Chalk Dust Torture.mp3",
   }
 
-  files := fsutil.FilesAudio(a.DirEntry)
+  files := fsutil.FilesAudio(a.Config.Dir)
   if len(files) == 0 {
     t.Errorf("No resulting files found.")
   }

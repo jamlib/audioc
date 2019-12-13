@@ -36,8 +36,8 @@ func TestProcessFlagsArtist(t *testing.T) {
   if cont == false {
     t.Errorf("Expected %v, got %v", true, cont)
   }
-  if c.Flags.Artist != os.Args[2] {
-    t.Errorf("Expected %v, got %v", os.Args[2], c.Flags.Artist)
+  if c.Artist != os.Args[2] {
+    t.Errorf("Expected %v, got %v", os.Args[2], c.Artist)
   }
 }
 

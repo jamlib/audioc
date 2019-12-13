@@ -16,30 +16,30 @@ func (a *audioc) processFile(index int) (*metadata.Metadata, error) {
   i := &metadata.Info{}
 
   // if --artist mode, artist is set from flag
-  if a.Flags.Artist != "" {
-    i.Artist = a.Flags.Artist
+  if a.Config.Artist != "" {
+    i.Artist = a.Config.Artist
   }
 
   // if --collection mode, artist set from parent folder name
-  if a.Flags.Collection {
+  if a.Config.Collection {
     i.Artist = strings.Split(a.Files[index], fsutil.PathSep)[0]
   }
 
   // if --album mode, album is set from flag
-  if a.Flags.Album != "" {
-    i.Album = i.MatchCleanAlbum(a.Flags.Album)
+  if a.Config.Album != "" {
+    i.Album = i.MatchCleanAlbum(a.Config.Album)
   }
 
   m := metadata.New(a.Files[index], i)
 
   // call Probe after setting m.Info.Artist
-  err := m.Probe(a.Ffprobe, filepath.Join(a.DirEntry, a.Files[index]))
+  err := m.Probe(a.Ffprobe, filepath.Join(a.Config.Dir, a.Files[index]))
   if err != nil {
     return m, err
   }
 
   // skip if sources match (unless --force)
-  if m.Match && !a.Flags.Force {
+  if m.Match && !a.Config.Force {
     m.Resultpath = a.Files[index]
     return m, nil
   }
@@ -48,7 +48,7 @@ func (a *audioc) processFile(index int) (*metadata.Metadata, error) {
   fpa := strings.Split(a.Files[index], fsutil.PathSep)
 
   // if --collection or artist/year folder in expected place
-  if a.Flags.Collection ||
+  if a.Config.Collection ||
     (len(fpa) > 2 && fpa[0] == m.Info.Artist && fpa[1] == m.Info.Year) {
 
     m.Resultpath = filepath.Join(m.Info.Artist, m.Info.Year)
@@ -69,7 +69,7 @@ func (a *audioc) processFile(index int) (*metadata.Metadata, error) {
   // append album name as directory
   m.Resultpath = filepath.Join(m.Resultpath, m.Info.ToAlbum(), m.Info.ToFile())
 
-  fp := filepath.Join(a.DirEntry, a.Files[index])
+  fp := filepath.Join(a.Config.Dir, a.Files[index])
 
   // print changes to be made
   p := fmt.Sprintf("\n%v\n", fp)
@@ -82,7 +82,7 @@ func (a *audioc) processFile(index int) (*metadata.Metadata, error) {
   if ext != ".flac" || !skipConvert(a.Files[index]) {
     // convert to mp3
     m.Resultpath += ".mp3"
-    p += fmt.Sprintf("  * convert to MP3 (%s)\n", a.Flags.Bitrate)
+    p += fmt.Sprintf("  * convert to MP3 (%s)\n", a.Config.Bitrate)
 
     _, err := a.processMp3(fp, m.Info)
     if err != nil {
@@ -96,7 +96,7 @@ func (a *audioc) processFile(index int) (*metadata.Metadata, error) {
 
   // compare processed to current path
   if a.Files[index] != m.Resultpath {
-    p += fmt.Sprintf("  * rename to: %v\n", filepath.Join(a.DirEntry, m.Resultpath))
+    p += fmt.Sprintf("  * rename to: %v\n", filepath.Join(a.Config.Dir, m.Resultpath))
   }
 
   // print to console all at once
@@ -116,12 +116,12 @@ func skipConvert(file string) bool {
 
 func (a *audioc) processMp3(f string, i *metadata.Info) (string, error) {
   // skip if not writing
-  if !a.Flags.Write {
+  if !a.Config.Write {
     return "", nil
   }
 
   // if already mp3, copy stream; do not convert
-  quality := a.Flags.Bitrate
+  quality := a.Config.Bitrate
   if strings.ToLower(filepath.Ext(f)) == ".mp3" {
     quality = "copy"
   }
@@ -136,7 +136,7 @@ func (a *audioc) processMp3(f string, i *metadata.Info) (string, error) {
   newFile := filepath.Join(a.Workdir, i.ToFile() + ".mp3")
 
   // process or convert to mp3
-  c := &ffmpeg.Mp3Config{ f, quality, newFile, ffmeta, a.Flags.Fix }
+  c := &ffmpeg.Mp3Config{ f, quality, newFile, ffmeta, a.Config.Fix }
   _, err := a.Ffmpeg.ToMp3(c)
   if err != nil {
     return newFile, err

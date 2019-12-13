@@ -18,16 +18,16 @@ import (
 // process each bundle or folder of audio files
 func (a *audioc) processBundle(indexes []int) error {
   var err error
-  fullDir := filepath.Dir(filepath.Join(a.DirEntry, a.Files[indexes[0]]))
+  fullDir := filepath.Dir(filepath.Join(a.Config.Dir, a.Files[indexes[0]]))
 
   // skip folder if possible (unless --force)
-  if !a.Flags.Force && a.skipFolder(a.Files[indexes[0]]) {
+  if !a.Config.Force && a.skipFolder(a.Files[indexes[0]]) {
     return nil
   }
 
   fmt.Printf("\nProcessing: %v ...\n", fullDir)
 
-  if a.Flags.Write {
+  if a.Config.Write {
     // create new random workdir within current path
     a.Workdir, err = ioutil.TempDir(fullDir, "")
     if err != nil {
@@ -48,13 +48,13 @@ func (a *audioc) processBundle(indexes []int) error {
     return err
   }
 
-  if a.Flags.Write {
+  if a.Config.Write {
     // explicitly remove workdir (before folder is possibly renamed)
     os.RemoveAll(a.Workdir)
 
     // TODO: iterate through mdSlice moving each file individually instead of
     // assuming all belong to same resulting directory
-    fullResultD := filepath.Dir(filepath.Join(a.DirEntry, mdSlice[0].Resultpath))
+    fullResultD := filepath.Dir(filepath.Join(a.Config.Dir, mdSlice[0].Resultpath))
 
     // if not same dir, rename directory to target dir
     if fullDir != fullResultD {
@@ -87,7 +87,7 @@ func (a *audioc) skipFolder(path string) bool {
 
   // determine which folder in path is the album name
   var alb string
-  if a.Flags.Collection {
+  if a.Config.Collection {
     // true if --collection & artist path contains " - "
     if strings.Index(pa[0], " - ") != -1 {
       return true
@@ -105,9 +105,9 @@ func (a *audioc) skipFolder(path string) bool {
 
   // true if album folder matches metadata.ToAlbum
   if len(alb) > 0 {
-    if a.Flags.Album != "" {
+    if a.Config.Album != "" {
       // if --album matches album folder
-      if a.Flags.Album == alb {
+      if a.Config.Album == alb {
         return true
       }
     } else {
@@ -126,12 +126,12 @@ func (a *audioc) skipFolder(path string) bool {
 func (a *audioc) processArtwork(file string) error {
   art := &albumart.AlbumArt{ Ffmpeg: a.Ffmpeg, Ffprobe: a.Ffprobe,
     ImgDecode: image.DecodeConfig, WithParentDir: true,
-    Fullpath: filepath.Join(a.DirEntry, file) }
+    Fullpath: filepath.Join(a.Config.Dir, file) }
 
   var err error
   a.Image = ""
 
-  if a.Flags.Write {
+  if a.Config.Write {
     a.Image, err = albumart.Process(art)
   }
 
