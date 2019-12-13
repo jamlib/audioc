@@ -52,18 +52,6 @@ func (a *audioc) processFile(index int) (*metadata.Metadata, error) {
     (len(fpa) > 2 && fpa[0] == m.Info.Artist && fpa[1] == m.Info.Year) {
 
     m.Resultpath = filepath.Join(m.Info.Artist, m.Info.Year)
-  } else {
-    // strip out innermost dirs that are irrelevant (ie, cd1)
-    foundAlbum := false
-    for x := len(m.Stripped)-1; x >= 0; x-- {
-      if m.Stripped[x] != "" {
-        if foundAlbum {
-          m.Resultpath = fpa[x] + fsutil.PathSep + m.Resultpath
-        } else {
-          foundAlbum = true
-        }
-      }
-    }
   }
 
   // append album name as directory

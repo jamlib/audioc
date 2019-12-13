@@ -14,7 +14,6 @@ import (
 
 type Metadata struct {
   Filepath, Resultpath string
-  Stripped []string
   Match bool
   Info *Info
 }
@@ -46,11 +45,11 @@ func New(filePath string, i *Info) *Metadata {
     filePath = filepath.Dir(filePath)
   }
 
-  // derive path info & save stripped dirs to know to remove later
-  m.Stripped = m.FromPath(filePath)
+  // derive path info
+  m.fromPath(filePath)
 
   if len(file) > 0 {
-    m.FromFile(fixWhitespace(strings.TrimSuffix(file, filepath.Ext(file))))
+    m.fromFile(fixWhitespace(strings.TrimSuffix(file, filepath.Ext(file))))
   }
 
   return m
@@ -66,24 +65,32 @@ func probeTagsToInfo(p *ffprobe.Tags) *Info {
 }
 
 // derive info album info from nested folder path
-func (m *Metadata) FromPath(p string) []string {
+// strip out innermost dirs that are irreleveant (ie cd1)
+func (m *Metadata) fromPath(p string) {
   sa := strings.Split(p, fsutil.PathSep)
 
   // start inner-most folder, work out
+  foundAlbum := false
   for x := len(sa)-1; x >= 0; x-- {
     sa[x] = m.Info.MatchCleanAlbum(sa[x])
 
-    // only overwrite album if not yet set
-    if len(m.Info.Album) == 0 {
-      m.Info.Album = matchAlbumOrTitle(sa[x])
+    if sa[x] != "" {
+      // only overwrite album if not yet set
+      if len(m.Info.Album) == 0 {
+        m.Info.Album = matchAlbumOrTitle(sa[x])
+      }
+
+      if foundAlbum {
+        m.Resultpath = sa[x] + fsutil.PathSep + m.Resultpath
+      } else {
+        foundAlbum = true
+      }
     }
   }
-
-  return sa
 }
 
 // determine Disc, Year, Month, Day, Track, Title from file string
-func (m *Metadata) FromFile(s string) {
+func (m *Metadata) fromFile(s string) {
   // match and remove date from anywhere within string
   s = m.Info.matchDate(s)
 
@@ -115,7 +122,7 @@ func (m *Metadata) Probe(ffp Ffprober, fp string) error {
   }
 
   // combine info w/ embedded tags
-  m.Info, m.Match = m.Info.MatchProbeInfo(probeTagsToInfo(d.Format.Tags))
+  m.Info, m.Match = m.Info.matchProbeInfo(probeTagsToInfo(d.Format.Tags))
 
   return nil
 }
@@ -162,7 +169,7 @@ func (i *Info) ToFile() string {
 
 // compare file & path info against ffprobe.Tags info and combine into best
 // return includes boolean if info sources match (no update necessary)
-func (i *Info) MatchProbeInfo(p *Info) (*Info, bool) {
+func (i *Info) matchProbeInfo(p *Info) (*Info, bool) {
   // compare using safeFilename since info is derived from filename
   compare := p
   compare.Album = safeFilename(compare.Album)

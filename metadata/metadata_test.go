@@ -78,7 +78,7 @@ func TestMatchProbeInfo(t *testing.T) {
   }
 
   for x := range tests {
-    rInfo, match := tests[x].info.MatchProbeInfo(probeTagsToInfo(tests[x].tags))
+    rInfo, match := tests[x].info.matchProbeInfo(probeTagsToInfo(tests[x].tags))
 
     if *rInfo != *tests[x].comb {
       t.Errorf("Expected %v, got %v", rInfo, tests[x].comb)
