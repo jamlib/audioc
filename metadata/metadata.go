@@ -60,16 +60,17 @@ func (m *Metadata) MatchBestInfo(c, p *Info) (*Info, bool) {
 
   // set custom album
   if len(c.Album) > 0 {
-    m.Info.Album = c.matchCleanAlbum(c.Album)
+    m.Info.mergeAlbumInfo(infoFromAlbum(c.Album), true)
   }
 
+  // pull info from album
+  p.mergeAlbumInfo(infoFromAlbum(p.Album), false)
+
   // compare using safeFilename since info is derived from filename
+  // and it is acceptable for tags to have special characters
   compare := p
   compare.Album = safeFilename(compare.Album)
   compare.Title = safeFilename(compare.Title)
-
-  // pull info from album
-  p.Album = p.matchCleanAlbum(p.Album)
 
   if *m.Info != *compare {
     if len(m.Info.Artist) == 0 {
@@ -113,12 +114,11 @@ func (m *Metadata) fromPath(p string) {
   // start inner-most folder, work out
   foundAlbum := false
   for x := len(sa)-1; x >= 0; x-- {
-    sa[x] = m.Info.matchCleanAlbum(sa[x])
+    i := infoFromAlbum(sa[x])
 
-    if sa[x] != "" {
-      // only overwrite album if not yet set
+    if len(i.Album) > 0 {
       if len(m.Info.Album) == 0 {
-        m.Info.Album = matchAlbumOrTitle(sa[x])
+        m.Info.mergeAlbumInfo(i, true)
       }
 
       if foundAlbum {
@@ -150,17 +150,34 @@ func (m *Metadata) fromFile(s string) {
   m.Info.Title = matchAlbumOrTitle(s)
 }
 
-func (i *Info) matchCleanAlbum(s string) string {
+func infoFromAlbum(s string) *Info {
+  i := &Info{}
   s = i.matchDiscOnly(s)
   s = i.matchDate(s)
   s = i.matchYearOnly(s)
-  return fixWhitespace(s)
+  i.Album = matchAlbumOrTitle(s)
+  return i
+}
+
+func (i *Info) mergeAlbumInfo(a *Info, force bool) {
+  if len(a.Album) > 0 && (force || !force) {
+    i.Album = a.Album
+  }
+  if len(a.Year) > 0 && (force || !force) {
+    i.Year = a.Year
+  }
+  if len(a.Month) > 0 && (force || !force) {
+    i.Month = a.Month
+  }
+  if len(a.Day) > 0 && (force || !force) {
+    i.Day = a.Day
+  }
 }
 
 // returns album prefixed with fulldate, year, or nothing (if no year)
 func (i *Info) ToAlbum() string {
-  if i.Year != "" {
-    if i.Month != "" && i.Day != ""{
+  if len(i.Year) > 0 {
+    if len(i.Month) > 0 && len(i.Day) > 0 {
       return fmt.Sprintf("%s.%s.%s %s", i.Year, i.Month, i.Day, i.Album)
     }
     return fmt.Sprintf("%s %s", i.Year, i.Album)
@@ -168,8 +185,8 @@ func (i *Info) ToAlbum() string {
   return i.Album
 }
 
-// returns filename string from Disc, Track, Title (ex: "01-01 Title.mp3")
-// without Disc (ex: "01 Title.mp3")
+// returns filename string from Disc, Track, Title (ex: "01-01 Title")
+// without Disc (ex: "01 Title")
 func (i *Info) ToFile() string {
   // closure to pad Disc & Track
   pad := func (s string) string {

@@ -147,7 +147,7 @@ func TestProcessMain(t *testing.T) {
 
   // compare relative folder path & file name with expected result
   fileResults := []string{
-    "2003.07.18 Alpine Valley, East Troy, WI/01-01 Axilla I.mp3",
+    "2003.07.18 Alpine Valley, East Troy, WI/01 Axilla I.mp3",
     "Phish/2003/2003.07.17 Bonner Springs, KS/01-01 Chalk Dust Torture.mp3",
   }
 
