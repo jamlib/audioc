@@ -12,24 +12,18 @@ import (
   "github.com/jamlib/audioc/metadata"
 )
 
-func (a *audioc) processFile(index int) (*metadata.Metadata, error) {
-  i := &metadata.Info{}
-
-  // if --artist mode, artist is set from flag
-  if a.Config.Artist != "" {
-    i.Artist = a.Config.Artist
-  }
+func (a *audioc) InfoFromConfig(index int) *metadata.Info {
+  i := &metadata.Info{ Artist: a.Config.Artist, Album: a.Config.Album }
 
   // if --collection mode, artist set from parent folder name
   if a.Config.Collection {
     i.Artist = strings.Split(a.Files[index], fsutil.PathSep)[0]
   }
 
-  // if --album mode, album is set from flag
-  if a.Config.Album != "" {
-    i.Album = i.MatchCleanAlbum(a.Config.Album)
-  }
+  return i
+}
 
+func (a *audioc) processFile(index int) (*metadata.Metadata, error) {
   m := metadata.New(a.Files[index])
 
   // info from embedded tags within audio file
@@ -38,7 +32,7 @@ func (a *audioc) processFile(index int) (*metadata.Metadata, error) {
     return m, err
   }
 
-  m.Info, m.Match = m.Info.MatchBestInfo(i,
+  m.Info, m.Match = m.MatchBestInfo(a.InfoFromConfig(index),
     metadata.ProbeTagsToInfo(d.Format.Tags))
 
   // skip if sources match (unless --force)

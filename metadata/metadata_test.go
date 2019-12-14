@@ -51,26 +51,27 @@ func TestToFile(t *testing.T) {
 
 func TestMatchProbeInfo(t *testing.T) {
   tests := []struct {
-    info, comb *Info
+    m *Metadata
+    comb *Info
     tags *ffprobe.Tags
     match bool
   }{
-    { info: &Info{ Album: "Kean College After Midnight", Title: "After Midnight" },
+    { m: &Metadata{Info: &Info{ Album: "Kean College After Midnight", Title: "After Midnight" }},
       tags: &ffprobe.Tags{ Album: "Something Else" },
       comb: &Info{ Album: "Kean College After Midnight", Title: "After Midnight" },
       match: false,
     },{
-      info: &Info{ Album: "Kean College After Midnight", Year: "1980" },
+      m: &Metadata{Info: &Info{ Album: "Kean College After Midnight", Year: "1980" }},
       tags: &ffprobe.Tags{ Album: "1980 Kean College After Midnight" },
       comb: &Info{ Album: "Kean College After Midnight", Year: "1980" },
       match: true,
     },{
-      info: &Info{ Album: "Kean College After Midnight", Year: "1980" },
+      m: &Metadata{Info: &Info{ Album: "Kean College After Midnight", Year: "1980" }},
       tags: &ffprobe.Tags{ Album: "1980.02.28 Kean College After Midnight" },
       comb: &Info{ Album: "Kean College After Midnight", Year: "1980", Month: "02", Day: "28" },
       match: false,
     },{
-      info: &Info{ Disc: "1" },
+      m: &Metadata{Info: &Info{ Disc: "1" }},
       tags: &ffprobe.Tags{ Disc: "1/2" },
       comb: &Info{ Disc: "1" },
       match: false,
@@ -78,7 +79,7 @@ func TestMatchProbeInfo(t *testing.T) {
   }
 
   for x := range tests {
-    rInfo, match := tests[x].info.MatchBestInfo(&Info{},
+    rInfo, match := tests[x].m.MatchBestInfo(&Info{},
       ProbeTagsToInfo(tests[x].tags))
 
     if *rInfo != *tests[x].comb {

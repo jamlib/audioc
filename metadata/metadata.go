@@ -23,11 +23,6 @@ type Info struct {
   Disc, Track, Title string
 }
 
-// Ffprober within context of metadata only needs to implement GetData
-type Ffprober interface {
-  GetData(filePath string) (*ffprobe.Data, error)
-}
-
 // filePath used to derive info
 func New(filePath string) *Metadata {
   var file string
@@ -51,11 +46,63 @@ func New(filePath string) *Metadata {
 
 // build info from ffprobe.Tags
 func ProbeTagsToInfo(p *ffprobe.Tags) *Info {
-  i := &Info{ Artist: p.Artist, Disc: p.Disc,
-    Track: p.Track, Title: p.Title }
+  return &Info{ Artist: p.Artist, Album: p.Album, Disc: p.Disc, Track: p.Track,
+    Title: p.Title }
+}
 
-  i.Album = strings.TrimSpace(i.MatchCleanAlbum(p.Album))
-  return i
+// compare file & path info against ffprobe.Tags info and combine into best
+// return includes boolean if info sources match (no update necessary)
+func (m *Metadata) MatchBestInfo(c, p *Info) (*Info, bool) {
+  // set custom artist
+  if len(c.Artist) > 0 {
+    m.Info.Artist = c.Artist
+  }
+
+  // set custom album
+  if len(c.Album) > 0 {
+    m.Info.Album = c.matchCleanAlbum(c.Album)
+  }
+
+  // compare using safeFilename since info is derived from filename
+  compare := p
+  compare.Album = safeFilename(compare.Album)
+  compare.Title = safeFilename(compare.Title)
+
+  // pull info from album
+  p.Album = p.matchCleanAlbum(p.Album)
+
+  if *m.Info != *compare {
+    if len(m.Info.Artist) == 0 {
+      m.Info.Artist = p.Artist
+    }
+    if len(m.Info.Year) == 0 {
+      m.Info.Year = p.Year
+    }
+    if len(m.Info.Month) == 0 {
+      m.Info.Month = p.Month
+    }
+    if len(m.Info.Day) == 0 {
+      m.Info.Day = p.Day
+    }
+    if len(m.Info.Disc) == 0 {
+      m.Info.Disc = regexp.MustCompile(`^\d+`).FindString(p.Disc)
+    }
+    if len(m.Info.Track) == 0 {
+      m.Info.Track = regexp.MustCompile(`^\d+`).FindString(p.Track)
+    }
+    // take longer album if custom album not set
+    if len(m.Info.Album) == 0 || (len(c.Album) == 0 && len(p.Album) > len(m.Info.Album)) {
+      m.Info.Album = p.Album
+    }
+    // take longer title
+    if len(m.Info.Title) < len(p.Title) {
+      m.Info.Title = p.Title
+    }
+
+    return m.Info, false
+  }
+
+  return m.Info, true
 }
 
 // derive info album info from nested folder path
@@ -66,7 +113,7 @@ func (m *Metadata) fromPath(p string) {
   // start inner-most folder, work out
   foundAlbum := false
   for x := len(sa)-1; x >= 0; x-- {
-    sa[x] = m.Info.MatchCleanAlbum(sa[x])
+    sa[x] = m.Info.matchCleanAlbum(sa[x])
 
     if sa[x] != "" {
       // only overwrite album if not yet set
@@ -103,7 +150,7 @@ func (m *Metadata) fromFile(s string) {
   m.Info.Title = matchAlbumOrTitle(s)
 }
 
-func (i *Info) MatchCleanAlbum(s string) string {
+func (i *Info) matchCleanAlbum(s string) string {
   s = i.matchDiscOnly(s)
   s = i.matchDate(s)
   s = i.matchYearOnly(s)
@@ -141,61 +188,6 @@ func (i *Info) ToFile() string {
     out += pad(i.Track) + " "
   }
   return out + safeFilename(i.Title)
-}
-
-// compare file & path info against ffprobe.Tags info and combine into best
-// return includes boolean if info sources match (no update necessary)
-func (i *Info) MatchBestInfo(c, p *Info) (*Info, bool) {
-  // set custom artist
-  if len(c.Artist) > 0 {
-    i.Artist = c.Artist
-  }
-
-  // set custom album
-  if len(c.Album) > 0 {
-    i.Album = c.Album
-  }
-
-  // compare using safeFilename since info is derived from filename
-  compare := p
-  compare.Album = safeFilename(compare.Album)
-  compare.Title = safeFilename(compare.Title)
-
-  if *i != *compare {
-    // info overrides probe for Artist
-    if len(p.Artist) == 0 || len(c.Artist) > 0 {
-      p.Artist = i.Artist
-    }
-
-    // update Year, Month, Day, Disc, Track if not set
-    if len(p.Year) == 0 {
-      p.Year = i.Year
-    }
-    if len(p.Month) == 0 {
-      p.Month = i.Month
-    }
-    if len(p.Day) == 0 {
-      p.Day = i.Day
-    }
-    if len(p.Disc) == 0 || regexp.MustCompile(`^\d+`).FindString(p.Disc) != p.Disc {
-      p.Disc = i.Disc
-    }
-    if len(p.Track) == 0 {
-      p.Track = i.Track
-    }
-
-    if (len(p.Album) < len(i.Album)) || len(c.Album) > 0 {
-      p.Album = i.Album
-    }
-
-    if len(p.Title) < len(i.Title) {
-      p.Title = i.Title
-    }
-
-    return p, false
-  }
-
-  return i, true
 }
 
 // converts roman numeral to int; only needs to support up to 5
