@@ -30,13 +30,16 @@ func (a *audioc) processFile(index int) (*metadata.Metadata, error) {
     i.Album = i.MatchCleanAlbum(a.Config.Album)
   }
 
-  m := metadata.New(a.Files[index], i)
+  m := metadata.New(a.Files[index])
 
-  // call Probe after setting m.Info.Artist
-  err := m.Probe(a.Ffprobe, filepath.Join(a.Config.Dir, a.Files[index]))
+  // info from embedded tags within audio file
+  d, err := a.Ffprobe.GetData(filepath.Join(a.Config.Dir, a.Files[index]))
   if err != nil {
     return m, err
   }
+
+  m.Info, m.Match = m.Info.MatchBestInfo(i,
+    metadata.ProbeTagsToInfo(d.Format.Tags))
 
   // skip if sources match (unless --force)
   if m.Match && !a.Config.Force {
@@ -51,6 +54,7 @@ func (a *audioc) processFile(index int) (*metadata.Metadata, error) {
   if a.Config.Collection ||
     (len(fpa) > 2 && fpa[0] == m.Info.Artist && fpa[1] == m.Info.Year) {
 
+    // override with custom resultpath
     m.Resultpath = filepath.Join(m.Info.Artist, m.Info.Year)
   }
 

@@ -78,7 +78,8 @@ func TestMatchProbeInfo(t *testing.T) {
   }
 
   for x := range tests {
-    rInfo, match := tests[x].info.matchProbeInfo(probeTagsToInfo(tests[x].tags))
+    rInfo, match := tests[x].info.MatchBestInfo(&Info{},
+      ProbeTagsToInfo(tests[x].tags))
 
     if *rInfo != *tests[x].comb {
       t.Errorf("Expected %v, got %v", rInfo, tests[x].comb)
@@ -98,7 +99,7 @@ func TestInfoFromFile(t *testing.T) {
   }
 
   for x := range tests {
-    m := New(tests[x][0][0], nil)
+    m := New(tests[x][0][0])
     compare := []string{ m.Info.Year, m.Info.Month, m.Info.Day,
       m.Info.Disc, m.Info.Track, m.Info.Title }
     if strings.Join(compare, "\n") != strings.Join(tests[x][1], "\n") {
@@ -118,7 +119,7 @@ func TestInfoFromPath(t *testing.T) {
   }
 
   for x := range tests {
-    m := New(tests[x][0][0], nil)
+    m := New(tests[x][0][0])
     compare := []string{ m.Info.Year, m.Info.Month, m.Info.Day, m.Info.Album }
     if strings.Join(compare, "\n") != strings.Join(tests[x][1], "\n") {
       t.Errorf("Expected %v, got %v", tests[x][1], compare)

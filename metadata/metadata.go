@@ -29,15 +29,9 @@ type Ffprober interface {
 }
 
 // filePath used to derive info
-func New(filePath string, i *Info) *Metadata {
-  // create info if not passed as arg
-  if i == nil {
-    i = &Info{}
-  }
-
-  // create new metadata
+func New(filePath string) *Metadata {
   var file string
-  m := &Metadata{ Filepath: filePath, Info: i }
+  m := &Metadata{ Filepath: filePath, Info: &Info{} }
 
   // derive file info if has file extension
   if regexp.MustCompile(`\.[A-Za-z0-9]{1,5}$`).FindString(filePath) != "" {
@@ -56,11 +50,11 @@ func New(filePath string, i *Info) *Metadata {
 }
 
 // build info from ffprobe.Tags
-func probeTagsToInfo(p *ffprobe.Tags) *Info {
+func ProbeTagsToInfo(p *ffprobe.Tags) *Info {
   i := &Info{ Artist: p.Artist, Disc: p.Disc,
     Track: p.Track, Title: p.Title }
 
-  i.Album = i.MatchCleanAlbum(p.Album)
+  i.Album = strings.TrimSpace(i.MatchCleanAlbum(p.Album))
   return i
 }
 
@@ -109,24 +103,6 @@ func (m *Metadata) fromFile(s string) {
   m.Info.Title = matchAlbumOrTitle(s)
 }
 
-func (m *Metadata) Probe(ffp Ffprober, fp string) error {
-  // info from embedded tags within audio file
-  d, err := ffp.GetData(fp)
-  if err != nil {
-    return err
-  }
-
-  // if artist not yet specified, use ffprobe artist tag
-  if m.Info.Artist == "" {
-    m.Info.Artist = d.Format.Tags.Artist
-  }
-
-  // combine info w/ embedded tags
-  m.Info, m.Match = m.Info.matchProbeInfo(probeTagsToInfo(d.Format.Tags))
-
-  return nil
-}
-
 func (i *Info) MatchCleanAlbum(s string) string {
   s = i.matchDiscOnly(s)
   s = i.matchDate(s)
@@ -169,7 +145,17 @@ func (i *Info) ToFile() string {
 
 // compare file & path info against ffprobe.Tags info and combine into best
 // return includes boolean if info sources match (no update necessary)
-func (i *Info) matchProbeInfo(p *Info) (*Info, bool) {
+func (i *Info) MatchBestInfo(c, p *Info) (*Info, bool) {
+  // set custom artist
+  if len(c.Artist) > 0 {
+    i.Artist = c.Artist
+  }
+
+  // set custom album
+  if len(c.Album) > 0 {
+    i.Album = c.Album
+  }
+
   // compare using safeFilename since info is derived from filename
   compare := p
   compare.Album = safeFilename(compare.Album)
@@ -177,7 +163,7 @@ func (i *Info) matchProbeInfo(p *Info) (*Info, bool) {
 
   if *i != *compare {
     // info overrides probe for Artist
-    if p.Artist != i.Artist {
+    if len(p.Artist) == 0 || len(c.Artist) > 0 {
       p.Artist = i.Artist
     }
 
@@ -198,13 +184,10 @@ func (i *Info) matchProbeInfo(p *Info) (*Info, bool) {
       p.Track = i.Track
     }
 
-    // TODO: use album of source that derived the most info
-    p.Album = strings.TrimSpace(p.Album)
-    if len(p.Album) < len(i.Album) {
+    if (len(p.Album) < len(i.Album)) || len(c.Album) > 0 {
       p.Album = i.Album
     }
 
-    // use the longer title
     if len(p.Title) < len(i.Title) {
       p.Title = i.Title
     }

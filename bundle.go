@@ -112,7 +112,7 @@ func (a *audioc) skipFolder(path string) bool {
       }
     } else {
       // derive metadata from album folder and see if it matches
-      m := metadata.New(alb, nil)
+      m := metadata.New(alb)
       if m.Info.ToAlbum() == alb {
         return true
       }
@@ -144,7 +144,7 @@ func (a *audioc) processArtwork(file string) error {
 // files to this location. {Info.title} is currently not used, only disc/track.
 func mergeFolderFunc(f string) (int, string) {
   // use metadata to obtain info from filename
-  m := metadata.New(f, nil)
+  m := metadata.New(f)
 
   disc, _ := strconv.Atoi(regexp.MustCompile(`^\d+`).FindString(m.Info.Disc))
   track, _ := strconv.Atoi(regexp.MustCompile(`^\d+`).FindString(m.Info.Track))
