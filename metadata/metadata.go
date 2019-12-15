@@ -53,17 +53,7 @@ func ProbeTagsToInfo(p *ffprobe.Tags) *Info {
 // compare file & path info against ffprobe.Tags info and combine into best
 // return includes boolean if info sources match (no update necessary)
 func (m *Metadata) MatchBestInfo(c, p *Info) (*Info, bool) {
-  // set custom artist
-  if len(c.Artist) > 0 {
-    m.Info.Artist = c.Artist
-  }
-
-  // set custom album
-  if len(c.Album) > 0 {
-    m.Info.mergeAlbumInfo(infoFromAlbum(c.Album), true)
-  }
-
-  // pull info from album
+  // pull date info from ffprobe.Tags album and force merge into itself
   p.mergeAlbumInfo(infoFromAlbum(p.Album), true)
 
   // compare using safeFilename since info is derived from filename
@@ -72,8 +62,11 @@ func (m *Metadata) MatchBestInfo(c, p *Info) (*Info, bool) {
   compare.Album = safeFilename(compare.Album)
   compare.Title = safeFilename(compare.Title)
 
+  match := true
   if *m.Info != *compare {
-    // take longer album if custom album not set
+    match = false
+
+    // take longer album
     m.Info.mergeAlbumInfo(p, false)
 
     if len(m.Info.Artist) == 0 {
@@ -89,11 +82,25 @@ func (m *Metadata) MatchBestInfo(c, p *Info) (*Info, bool) {
     if len(m.Info.Title) < len(p.Title) {
       m.Info.Title = p.Title
     }
-
-    return m.Info, false
   }
 
-  return m.Info, true
+  // set custom artist
+  if len(c.Artist) > 0 {
+    if c.Artist != m.Info.Artist {
+      match = false
+    }
+    m.Info.Artist = c.Artist
+  }
+
+  // set custom album
+  if len(c.Album) > 0 {
+    if c.Album != m.Info.ToAlbum() {
+      match = false
+    }
+    m.Info.mergeAlbumInfo(infoFromAlbum(c.Album), true)
+  }
+
+  return m.Info, match
 }
 
 // derive info album info from nested folder path
