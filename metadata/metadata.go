@@ -64,7 +64,7 @@ func (m *Metadata) MatchBestInfo(c, p *Info) (*Info, bool) {
   }
 
   // pull info from album
-  p.mergeAlbumInfo(infoFromAlbum(p.Album), false)
+  p.mergeAlbumInfo(infoFromAlbum(p.Album), true)
 
   // compare using safeFilename since info is derived from filename
   // and it is acceptable for tags to have special characters
@@ -73,27 +73,17 @@ func (m *Metadata) MatchBestInfo(c, p *Info) (*Info, bool) {
   compare.Title = safeFilename(compare.Title)
 
   if *m.Info != *compare {
+    // take longer album if custom album not set
+    m.Info.mergeAlbumInfo(p, false)
+
     if len(m.Info.Artist) == 0 {
       m.Info.Artist = p.Artist
-    }
-    if len(m.Info.Year) == 0 {
-      m.Info.Year = p.Year
-    }
-    if len(m.Info.Month) == 0 {
-      m.Info.Month = p.Month
-    }
-    if len(m.Info.Day) == 0 {
-      m.Info.Day = p.Day
     }
     if len(m.Info.Disc) == 0 {
       m.Info.Disc = regexp.MustCompile(`^\d+`).FindString(p.Disc)
     }
     if len(m.Info.Track) == 0 {
       m.Info.Track = regexp.MustCompile(`^\d+`).FindString(p.Track)
-    }
-    // take longer album if custom album not set
-    if len(m.Info.Album) == 0 || (len(c.Album) == 0 && len(p.Album) > len(m.Info.Album)) {
-      m.Info.Album = p.Album
     }
     // take longer title
     if len(m.Info.Title) < len(p.Title) {
@@ -160,16 +150,16 @@ func infoFromAlbum(s string) *Info {
 }
 
 func (i *Info) mergeAlbumInfo(a *Info, force bool) {
-  if len(a.Album) > 0 && (force || !force) {
+  if len(a.Album) > 0 && (force || !force && len(a.Album) > len(i.Album)) {
     i.Album = a.Album
   }
-  if len(a.Year) > 0 && (force || !force) {
+  if len(a.Year) > 0 && (force || !force && len(i.Year) == 0) {
     i.Year = a.Year
   }
-  if len(a.Month) > 0 && (force || !force) {
+  if len(a.Month) > 0 && (force || !force && len(i.Month) == 0) {
     i.Month = a.Month
   }
-  if len(a.Day) > 0 && (force || !force) {
+  if len(a.Day) > 0 && (force || !force && len(i.Day) == 0) {
     i.Day = a.Day
   }
 }
